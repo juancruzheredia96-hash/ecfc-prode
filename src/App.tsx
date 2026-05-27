@@ -56,7 +56,7 @@ const PAISES: Record<string, string> = {
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Barlow', sans-serif; background: var(--marfil-light, #f0ece0); min-height: 100vh; display: flex; justify-content: center; }
+  body { font-family: 'Barlow', sans-serif; background: #1a1a1a; min-height: 100vh; display: flex; justify-content: center; }
   input[type=number]::-webkit-inner-spin-button,
   input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   input[type=number] { -moz-appearance: textfield; }
@@ -411,7 +411,7 @@ function TabTabla() {
                   : <span style={{ fontSize:11, fontWeight:500, color:BORDO }}>{(j.ini||"?").slice(0,2)}</span>
                 }
               </div>
-              <span style={{ flex:1, fontSize:13, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", paddingRight:4 }}>{j.nick||"Usuario"}</span>
+              <span style={{ flex:1, fontSize:13, paddingRight:4 }}>{j.nick||"Usuario"}</span>
               <span style={{ fontSize:14, fontWeight:600, color:MARFIL, background:BORDO,
                 padding:"2px 7px", borderRadius:3, minWidth:30, textAlign:"center" }}>{j.pts||0}</span>
               <span style={{ fontSize:11, color:VERDE, minWidth:28, textAlign:"right" }}>+{j.hoy||0}</span>
@@ -1289,8 +1289,7 @@ export default function App() {
   return (
     <>
       <style>{css}</style>
-      <div style={{ width:"100%", maxWidth:480, background:"white", minHeight:"100vh",
-        display:"flex", flexDirection:"column" }}>
+      <div style={{ width:390, maxWidth:"100%", background:"white", minHeight:"100vh", display:"flex", flexDirection:"column", borderRadius:28, overflow:"hidden", boxShadow:"0 8px 40px rgba(0,0,0,0.5)", margin:"20px auto" }}>
         <div style={{ background:BORDO, padding:"10px 20px 6px",
           display:"flex", justifyContent:"space-between", flexShrink:0 }}>
           <span style={{ color:MARFIL, fontSize:11, fontWeight:500 }}>{horaArt}</span>
