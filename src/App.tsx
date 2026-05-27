@@ -56,7 +56,7 @@ const PAISES: Record<string, string> = {
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Barlow', sans-serif; background: #1a1a1a; min-height: 100vh; display: flex; justify-content: center; }
+  body { font-family: 'Barlow', sans-serif; background: var(--marfil-light, #f0ece0); min-height: 100vh; display: flex; justify-content: center; }
   input[type=number]::-webkit-inner-spin-button,
   input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   input[type=number] { -moz-appearance: textfield; }
@@ -383,7 +383,7 @@ function TabTabla() {
         <div style={{ display:"flex", padding:"4px 12px", background:BORDO_DARK, gap:6 }}>
           {["#","","Jugador","Pts","+Hoy","▲▼"].map((h,i) => (
             <span key={i} style={{ fontSize:9, color:MARFIL_DARK, fontWeight:500,
-              minWidth:i===0?18:i===1?30:i===3?38:i===4?28:i===5?22:"auto",
+              minWidth:i===0?20:i===1?34:i===3?36:i===4?26:i===5?24:"auto",
               flex:i===2?1:undefined, textAlign:i>=3?"right":"left" }}>{h}</span>
           ))}
         </div>
@@ -411,7 +411,7 @@ function TabTabla() {
                   : <span style={{ fontSize:11, fontWeight:500, color:BORDO }}>{(j.ini||"?").slice(0,2)}</span>
                 }
               </div>
-              <span style={{ flex:1, fontSize:12 }}>{j.nick||"Usuario"}</span>
+              <span style={{ flex:1, fontSize:13, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", paddingRight:4 }}>{j.nick||"Usuario"}</span>
               <span style={{ fontSize:14, fontWeight:600, color:MARFIL, background:BORDO,
                 padding:"2px 7px", borderRadius:3, minWidth:30, textAlign:"center" }}>{j.pts||0}</span>
               <span style={{ fontSize:11, color:VERDE, minWidth:28, textAlign:"right" }}>+{j.hoy||0}</span>
@@ -629,18 +629,18 @@ return (
                 { pais:stats.partido?.localN, avg:stats.promedioL },
                 { pais:stats.partido?.visitaN, avg:stats.promedioV },
               ].map(row => (
-                <div key={row.pais} style={{ display:"flex", alignItems:"center",
-                  gap:8, marginBottom:8 }}>
-                  <div style={{ display:"flex", alignItems:"center", gap:5, minWidth:120 }}>
-                    <FlagImg pais={row.pais} size={18} />
-                    <span style={{ fontSize:12, fontWeight:500 }}>{row.pais}</span>
+                <div key={row.pais} style={{ marginBottom:12 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:5, marginBottom:5 }}>
+                    <FlagImg pais={row.pais} size={16} />
+                    <span style={{ fontSize:12, fontWeight:500, color:BORDO }}>{row.pais}</span>
+                    <span style={{ fontSize:13, fontWeight:700, color:BORDO, marginLeft:"auto" }}>
+                      {row.avg.toFixed(1)}
+                    </span>
                   </div>
-                  <div style={{ flex:1, height:8, background:"#eee", borderRadius:4, overflow:"hidden" }}>
-                    <div style={{ height:"100%", borderRadius:4, background:BORDO,
-                      width:`${Math.round(row.avg/maxBar*100)}%` }}/>
-                  </div>
-                  <div style={{ fontSize:14, fontWeight:700, color:BORDO, minWidth:28, textAlign:"right" }}>
-                    {row.avg.toFixed(1)}
+                  <div style={{ width:"100%", height:10, background:"#eee", borderRadius:5, overflow:"hidden" }}>
+                    <div style={{ height:"100%", borderRadius:5, background:BORDO,
+                      width:`${Math.round(row.avg/maxBar*100)}%`,
+                      transition:"width 0.3s ease" }}/>
                   </div>
                 </div>
               ))}
@@ -1227,11 +1227,11 @@ function TabPerfil({ user, onLogout, isAdmin }: { user:any, onLogout:()=>void, i
           { icon:"🚪", label:"Cerrar sesión", action:onLogout, danger:true },
         ].map((row,i,arr)=>(
           <div key={row.label} onClick={row.action} style={{ display:"flex", alignItems:"center",
-            gap:10, padding:"12px 16px", borderBottom:i<arr.length-1?"0.5px solid #eee":"none",
+            gap:12, padding:"14px 16px", borderBottom:i<arr.length-1?"0.5px solid #eee":"none",
             cursor:"pointer" }}>
-            <span style={{ fontSize:17 }}>{row.icon}</span>
-            <span style={{ fontSize:13, color:(row as any).danger?ROJO:"inherit" }}>{row.label}</span>
-            <span style={{ marginLeft:"auto", color:"#ccc", fontSize:16 }}>›</span>
+            <span style={{ fontSize:18, minWidth:24, textAlign:"center" }}>{row.icon}</span>
+            <span style={{ fontSize:14, color:(row as any).danger?ROJO:BORDO, fontWeight:500, flex:1 }}>{row.label}</span>
+            <span style={{ color:"#ccc", fontSize:16 }}>›</span>
           </div>
         ))}
       </div>
