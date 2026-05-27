@@ -435,8 +435,8 @@ function TabTendencias() {
   useEffect(() => {
     const q = query(collection(db, "partidos"), orderBy("fecha"), orderBy("hora"));
     return onSnapshot(q, snap => {
-      const data = snap.docs.map(d => ({ id:d.id, ...d.data() }));
-      const sinResultado = data.filter(p => p.localN !== "Por definir" && p.visitaN !== "Por definir");
+      const data = snap.docs.map(d => ({ id:d.id, ...d.data() })) as any[];
+      const sinResultado = data.filter((p:any) => p.localN !== "Por definir" && p.visitaN !== "Por definir");
       setPartidos(sinResultado);
       if (sinResultado.length > 0 && !selectedId) setSelectedId(sinResultado[0].id);
     });
@@ -512,7 +512,7 @@ function TabTendencias() {
     if (total===0) return null;
     const pL=vL/total, pE=vE/total;
     const r=38, cx=50, cy=50;
-    function arc(start: number, end: number, color: string) {
+    function arc(start: number, end: number, _color: string) {
       if (end-start < 0.001) return '';
       const a1=(start*2*Math.PI)-Math.PI/2, a2=(end*2*Math.PI)-Math.PI/2;
       const x1=cx+r*Math.cos(a1), y1=cy+r*Math.sin(a1);
@@ -534,9 +534,7 @@ function TabTendencias() {
     );
   }
 
-  const selectedPartido = partidos.find(p => p.id === selectedId);
-
-  return (
+return (
     <div style={{ padding:12, background:MARFIL_LIGHT, minHeight:"70vh" }}>
       <select value={selectedId} onChange={e => setSelectedId(e.target.value)}
         style={{ width:"100%", padding:"9px 12px", border:`1.5px solid ${BORDO_LIGHT}`,
@@ -924,7 +922,7 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
       ) : vista==="lista" ? (
         <div>
           <div style={{ fontSize:12, fontWeight:600, color:BORDO, marginBottom:8 }}>📋 Partidos ({partidos.length})</div>
-          {partidos.map((p,i) => (
+          {partidos.map((p) => (
             <div key={p.id} style={{ background:"white", borderRadius:8, border:"0.5px solid #e0ddd5", padding:"10px 12px", marginBottom:6 }}>
               {confirmDelete===p.id ? (
                 <div>
@@ -1143,7 +1141,7 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [lockHoras, setLockHoras] = useState(1);
+  const lockHoras = 1;
   const [horaArt, setHoraArt] = useState(horaART());
 
   useEffect(() => {
