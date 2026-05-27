@@ -510,25 +510,41 @@ function TabTendencias() {
   function Donut({ vL, vE, vV }: { vL:number, vE:number, vV:number }) {
     const total = vL+vE+vV;
     if (total===0) return null;
-    const pL=vL/total, pE=vE/total;
+    const pL=vL/total, pE=vE/total, pV=vV/total;
     const r=38, cx=50, cy=50;
-    function arc(start: number, end: number, _color: string) {
-      if (end-start < 0.001) return '';
-      const a1=(start*2*Math.PI)-Math.PI/2, a2=(end*2*Math.PI)-Math.PI/2;
+
+    function arc(startPct: number, endPct: number) {
+      if (endPct - startPct < 0.0001) return null;
+      // Full circle case
+      if (endPct - startPct >= 0.9999) {
+        return `M${cx},${cy-r} A${r},${r} 0 1,1 ${cx-0.001},${cy-r} Z`;
+      }
+      const a1=(startPct*2*Math.PI)-Math.PI/2;
+      const a2=(endPct*2*Math.PI)-Math.PI/2;
       const x1=cx+r*Math.cos(a1), y1=cy+r*Math.sin(a1);
       const x2=cx+r*Math.cos(a2), y2=cy+r*Math.sin(a2);
-      const lg=(end-start)>0.5?1:0;
+      const lg=(endPct-startPct)>0.5?1:0;
       return `M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${lg},1 ${x2},${y2} Z`;
     }
+
+    const s1 = arc(0, pL);
+    const s2 = arc(pL, pL+pE);
+    const s3 = arc(pL+pE, pL+pE+pV);
+
+    // Determine what % to show in center (largest segment)
+    const maxPct = Math.max(pL, pE, pV);
+    const maxLabel = maxPct===pL ? `${Math.round(pL*100)}%` : maxPct===pE ? `${Math.round(pE*100)}%` : `${Math.round(pV*100)}%`;
+    const maxSub = maxPct===pL ? "local" : maxPct===pE ? "empate" : "visita";
+
     return (
       <svg viewBox="0 0 100 100" width={86} height={86}>
-        <path d={arc(0,pL,BORDO)} fill={BORDO}/>
-        <path d={arc(pL,pL+pE,MARFIL_DARK)} fill={MARFIL_DARK}/>
-        <path d={arc(pL+pE,1,MARFIL)} fill={MARFIL} stroke="#ddd" strokeWidth="0.5"/>
+        {s1 && <path d={s1} fill={BORDO}/>}
+        {s2 && <path d={s2} fill={MARFIL_DARK}/>}
+        {s3 && <path d={s3} fill={MARFIL} stroke="#ddd" strokeWidth="0.5"/>}
         <circle cx={cx} cy={cy} r={22} fill="white"/>
-        <text x={cx} y={cy-4} textAnchor="middle" fontSize={8} fill="#888">local</text>
+        <text x={cx} y={cy-4} textAnchor="middle" fontSize={8} fill="#888">{maxSub}</text>
         <text x={cx} y={cy+8} textAnchor="middle" fontSize={12} fontWeight="bold" fill={BORDO}>
-          {Math.round(pL*100)}%
+          {maxLabel}
         </text>
       </svg>
     );
@@ -856,9 +872,96 @@ function FormResultado({ partidos, onClose }: { partidos:any[], onClose:()=>void
   );
 }
 
+function GestionAdmins({ onBack }: { onBack: ()=>void }) {
+  const [usuarios, setUsuarios] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    const q = query(collection(db, "usuarios"), orderBy("pts", "desc"));
+    return onSnapshot(q, snap => {
+      setUsuarios(snap.docs.map(d => ({ id:d.id, ...d.data() })));
+    });
+  }, []);
+
+  async function toggleAdmin(userId: string, esAdmin: boolean) {
+    setLoading(true);
+    await setDoc(doc(db, "usuarios", userId), { isAdmin: !esAdmin }, { merge: true });
+    setMsg(!esAdmin ? "✓ Admin asignado" : "✓ Admin removido");
+    setLoading(false);
+    setTimeout(() => setMsg(""), 3000);
+  }
+
+  const admins = usuarios.filter(u => u.isAdmin);
+
+  return (
+    <div style={{ padding:12, background:MARFIL_LIGHT, minHeight:"70vh" }}>
+      <button onClick={onBack} style={{ background:"none", border:"none", color:BORDO,
+        fontSize:12, marginBottom:12, display:"flex", alignItems:"center", gap:4 }}>
+        ← Volver al panel
+      </button>
+      <div style={{ fontSize:12, fontWeight:600, color:BORDO, marginBottom:4 }}>🛡️ Gestión de administradores</div>
+      <div style={{ fontSize:10, color:"#888", marginBottom:12 }}>
+        Admins activos: {admins.length}/5
+      </div>
+
+      {msg && <div style={{ background:VERDE, color:"white", borderRadius:6,
+        padding:"8px 12px", fontSize:12, marginBottom:10 }}>{msg}</div>}
+
+      <div style={{ background:"white", borderRadius:12, border:"0.5px solid #e0ddd5", overflow:"hidden" }}>
+        {usuarios.length === 0 && (
+          <div style={{ padding:20, textAlign:"center", fontSize:12, color:"#aaa" }}>
+            No hay usuarios registrados aún
+          </div>
+        )}
+        {usuarios.map((u, i) => (
+          <div key={u.id} style={{ display:"flex", alignItems:"center", gap:10,
+            padding:"10px 14px",
+            borderBottom: i < usuarios.length-1 ? "0.5px solid #eee" : "none" }}>
+            <div style={{ width:34, height:34, borderRadius:"50%", border:`1.5px solid ${BORDO}`,
+              overflow:"hidden", background:MARFIL, flexShrink:0,
+              display:"flex", alignItems:"center", justifyContent:"center" }}>
+              {u.photoURL
+                ? <img src={u.photoURL} alt={u.nick} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                : <span style={{ fontSize:12, fontWeight:500, color:BORDO }}>{(u.ini||"?").slice(0,2)}</span>
+              }
+            </div>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:13, fontWeight:500 }}>{u.nick || "Sin nick"}</div>
+              <div style={{ fontSize:10, color:"#888" }}>{u.email}</div>
+            </div>
+            {u.isAdmin && (
+              <span style={{ background:BORDO, color:MARFIL, fontSize:9,
+                padding:"2px 7px", borderRadius:20, marginRight:4 }}>Admin</span>
+            )}
+            <button
+              onClick={() => toggleAdmin(u.id, u.isAdmin)}
+              disabled={loading || (!u.isAdmin && admins.length >= 5)}
+              style={{
+                background: u.isAdmin ? "none" : BORDO,
+                color: u.isAdmin ? ROJO : MARFIL,
+                border: u.isAdmin ? `1px solid ${ROJO}` : "none",
+                borderRadius:6, fontSize:11, padding:"5px 10px", fontWeight:600,
+                opacity: (!u.isAdmin && admins.length >= 5) ? 0.4 : 1,
+                cursor: (!u.isAdmin && admins.length >= 5) ? "not-allowed" : "pointer"
+              }}>
+              {u.isAdmin ? "Quitar" : "Hacer admin"}
+            </button>
+          </div>
+        ))}
+      </div>
+      {admins.length >= 5 && (
+        <div style={{ fontSize:10, color:ROJO, marginTop:8, textAlign:"center" }}>
+          Límite de 5 admins alcanzado. Remové uno para agregar otro.
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminPanel({ onBack }: { onBack:()=>void }) {
   const [partidos, setPartidos] = useState<any[]>([]);
-  const [vista, setVista] = useState<"menu"|"nuevo"|"resultado"|"lista"|"csv">("menu");
+  const [vista, setVista] = useState<"menu"|"nuevo"|"resultado"|"lista"|"csv"|"admins">("menu");
   const [editando, setEditando] = useState<any>(null);
   const [confirmDelete, setConfirmDelete] = useState<string|null>(null);
   const [confirmBorrarTodo, setConfirmBorrarTodo] = useState(false);
@@ -917,6 +1020,8 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
         <FormPartido onSave={guardarPartido} onCancel={()=>{setVista("menu");setEditando(null);}} initial={editando} />
       ) : vista==="resultado" ? (
         <FormResultado partidos={partidos} onClose={()=>setVista("menu")} />
+      ) : vista==="admins" ? (
+        <GestionAdmins onBack={() => setVista("menu")} />
       ) : vista==="csv" ? (
         <ImportarCSV onClose={()=>setVista("menu")} />
       ) : vista==="lista" ? (
@@ -998,7 +1103,7 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
 
           <div style={{ background:"white", borderRadius:12, border:"0.5px solid #e0ddd5", overflow:"hidden" }}>
             <div style={{ background:BORDO_DARK, padding:"8px 12px" }}><span style={{ color:MARFIL, fontSize:12, fontWeight:600 }}>👥 Usuarios</span></div>
-            <div style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderBottom:"0.5px solid #eee" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderBottom:"0.5px solid #eee", cursor:"pointer" }} onClick={() => setVista("admins")}>
               <span style={{ fontSize:16 }}>🛡️</span>
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:12, fontWeight:500 }}>Asignar administradores</div>
