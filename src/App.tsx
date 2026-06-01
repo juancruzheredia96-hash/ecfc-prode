@@ -88,6 +88,8 @@ const JUGADORES_BASE: Record<string, string[]> = {
     "Mathys Tel","Florian Wirtz","Xavi Simons",
   ],
 };
+
+const css = `
   @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Barlow', sans-serif; background: #f0ece0; min-height: 100vh; display: flex; justify-content: center; margin: 0; }
