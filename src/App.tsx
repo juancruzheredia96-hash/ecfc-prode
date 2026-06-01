@@ -53,7 +53,41 @@ const PAISES: Record<string, string> = {
   "Irak":"iq","Rumanía":"ro","Por definir":"",
 };
 
-const css = `
+const FECHA_CIERRE_PREDICCIONES = new Date("2026-06-11T15:00:00-03:00");
+
+const PREDICCIONES_CATEGORIAS = [
+  { id:"campeon", label:"Campeón", emoji:"🏆", pts:10, tipo:"pais" },
+  { id:"balon_oro", label:"Balón de Oro", emoji:"⚽", pts:5, tipo:"jugador" },
+  { id:"bota_oro", label:"Bota de Oro", emoji:"👟", pts:5, tipo:"jugador" },
+  { id:"guante_oro", label:"Guante de Oro", emoji:"🧤", pts:5, tipo:"jugador" },
+  { id:"mejor_joven", label:"Mejor Jugador Joven", emoji:"🌟", pts:5, tipo:"jugador" },
+];
+
+const JUGADORES_BASE: Record<string, string[]> = {
+  balon_oro: [
+    "Lionel Messi","Kylian Mbappé","Vinicius Jr","Jude Bellingham","Erling Haaland",
+    "Mohamed Salah","Kevin De Bruyne","Pedri","Rodri","Lamine Yamal","Robert Lewandowski",
+    "Ángel Di María","Alexis Mac Allister","Rodrigo De Paul","Julián Álvarez","Paulo Dybala",
+    "Cristiano Ronaldo","Bruno Fernandes","Rafael Leão","Bernardo Silva",
+    "Darwin Núñez","Federico Valverde","Edinson Cavani","João Félix",
+  ],
+  bota_oro: [
+    "Kylian Mbappé","Erling Haaland","Vinicius Jr","Robert Lewandowski","Harry Kane",
+    "Victor Osimhen","Lautaro Martínez","Darwin Núñez","Julián Álvarez","Lionel Messi",
+    "Cristiano Ronaldo","Romelu Lukaku","Paulo Dybala","Antoine Griezmann",
+  ],
+  guante_oro: [
+    "Thibaut Courtois","Alisson Becker","Ederson","Marc-André ter Stegen",
+    "Gianluigi Donnarumma","Emiliano Martínez","Yassine Bounou","Mike Maignan",
+    "Wojciech Szczęsny","David Raya",
+  ],
+  mejor_joven: [
+    "Lamine Yamal","Gavi","Eduardo Camavinga","Endrick","Savinho","Kobbie Mainoo",
+    "Arda Güler","Warren Zaïre-Emery","Alejandro Garnacho","Claudio Echeverri",
+    "Franco Mastantuono","Nicolás Barrios","Facundo Buonanotte","Pedri",
+    "Mathys Tel","Florian Wirtz","Xavi Simons",
+  ],
+};
   @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Barlow', sans-serif; background: #f0ece0; min-height: 100vh; display: flex; justify-content: center; margin: 0; }
@@ -202,6 +236,9 @@ function MatchCard({ match, userId, lockHoras }: { match: any, userId: string, l
   const [mL, setML] = useState<number|null>(null);
   const [mV, setMV] = useState<number|null>(null);
   const [saved, setSaved] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [aciertos, setAciertos] = useState<{tres:string[], dos:string[], uno:string[]}>({tres:[],dos:[],uno:[]});
+  const [loadingAciertos, setLoadingAciertos] = useState(false);
   const hasResult = match.gL !== null && match.gL !== undefined;
   const bloqueado = hasResult || estaBloquado(match.fecha, match.hora, lockHoras);
   const pts = calcPtsNuevo(match.gL ?? null, match.gV ?? null, mL, mV);
@@ -212,6 +249,30 @@ function MatchCard({ match, userId, lockHoras }: { match: any, userId: string, l
       if (snap.exists()) { setML(snap.data().mL); setMV(snap.data().mV); setSaved(true); }
     });
   }, [match.id, userId]);
+
+  async function toggleExpanded() {
+    if (!hasResult) return;
+    if (!expanded && aciertos.tres.length === 0 && aciertos.dos.length === 0 && aciertos.uno.length === 0) {
+      setLoadingAciertos(true);
+      const pronosSnap = await getDocs(collection(db, "pronosticos"));
+      const delPartido = pronosSnap.docs.filter(d => d.data().matchId === match.id);
+      const usuariosSnap = await getDocs(collection(db, "usuarios"));
+      const usuariosMap: Record<string,string> = {};
+      usuariosSnap.docs.forEach(d => { usuariosMap[d.id] = d.data().nick || "?"; });
+      const tres: string[] = [], dos: string[] = [], uno: string[] = [];
+      delPartido.forEach(d => {
+        const { userId:uid, mL:pL, mV:pV } = d.data();
+        const p = calcPtsNuevo(match.gL, match.gV, pL, pV);
+        const nick = usuariosMap[uid] || "?";
+        if (p === 3) tres.push(nick);
+        else if (p === 2) dos.push(nick);
+        else if (p === 1) uno.push(nick);
+      });
+      setAciertos({ tres, dos, uno });
+      setLoadingAciertos(false);
+    }
+    setExpanded(e => !e);
+  }
 
   async function save() {
     if (mL === null || mV === null || bloqueado) return;
@@ -286,6 +347,48 @@ function MatchCard({ match, userId, lockHoras }: { match: any, userId: string, l
           }
         </div>
       </div>
+      {hasResult && (
+        <div>
+          <div onClick={toggleExpanded}
+            style={{ borderTop:"0.5px solid #eee", marginTop:8, paddingTop:8,
+              display:"flex", alignItems:"center", justifyContent:"center",
+              cursor:"pointer", gap:4 }}>
+            <span style={{ fontSize:10, color:BORDO, fontWeight:500 }}>
+              {expanded ? "▲ Ocultar aciertos" : "▼ Ver quién acertó"}
+            </span>
+          </div>
+          {expanded && (
+            <div style={{ marginTop:8 }}>
+              {loadingAciertos ? (
+                <div style={{ fontSize:11, color:"#888", textAlign:"center", padding:8 }}>Cargando...</div>
+              ) : (
+                <div style={{ display:"flex", gap:8 }}>
+                  {[
+                    { label:"⭐ 3 pts", nicks:aciertos.tres, color:VERDE },
+                    { label:"✓ 2 pts", nicks:aciertos.dos, color:AMARILLO },
+                    { label:"~ 1 pt", nicks:aciertos.uno, color:"#888" },
+                  ].filter(g => g.nicks.length > 0).map(grupo => (
+                    <div key={grupo.label} style={{ flex:1, background:MARFIL_LIGHT,
+                      borderRadius:8, padding:"8px 10px" }}>
+                      <div style={{ fontSize:10, fontWeight:600, color:grupo.color,
+                        marginBottom:6 }}>{grupo.label}</div>
+                      {grupo.nicks.map(nick => (
+                        <div key={nick} style={{ fontSize:11, color:"#333",
+                          padding:"2px 0", borderBottom:"0.5px solid #eee" }}>{nick}</div>
+                      ))}
+                    </div>
+                  ))}
+                  {aciertos.tres.length === 0 && aciertos.dos.length === 0 && aciertos.uno.length === 0 && (
+                    <div style={{ fontSize:11, color:"#888", textAlign:"center", width:"100%", padding:8 }}>
+                      Nadie acertó este partido
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -441,6 +544,148 @@ function TabTabla() {
 }
 
 // ─── Tab Tendencias ───────────────────────────────────────────────────────────
+
+function prediccionesBloqueadas(): boolean {
+  return new Date() >= FECHA_CIERRE_PREDICCIONES;
+}
+
+function PlayerAutocomplete({ value, onChange, categoria }: { value:string, onChange:(v:string)=>void, categoria:string }) {
+  const [query, setQuery] = useState(value);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [jugadoresDB, setJugadoresDB] = useState<string[]>([]);
+
+  useEffect(() => {
+    getDocs(collection(db, "jugadores_predicciones")).then(snap => {
+      setJugadoresDB(snap.docs.map(d => d.data().nombre));
+    });
+  }, []);
+
+  const base = JUGADORES_BASE[categoria] || [];
+  const todos = [...new Set([...base, ...jugadoresDB])].sort();
+
+  function handleInput(val: string) {
+    setQuery(val);
+    if (val.length < 2) { setSuggestions([]); return; }
+    setSuggestions(todos.filter(j => j.toLowerCase().includes(val.toLowerCase())).slice(0, 6));
+  }
+
+  async function select(nombre: string) {
+    setQuery(nombre);
+    onChange(nombre);
+    setSuggestions([]);
+    if (!base.includes(nombre) && !jugadoresDB.includes(nombre)) {
+      await addDoc(collection(db, "jugadores_predicciones"), { nombre, categoria, createdAt: serverTimestamp() });
+    }
+  }
+
+  return (
+    <div style={{ position:"relative" }}>
+      <input value={query} onChange={e => handleInput(e.target.value)}
+        placeholder="Escribí un nombre..."
+        disabled={prediccionesBloqueadas()}
+        style={{ ...inputStyle(), opacity: prediccionesBloqueadas() ? 0.6 : 1 }} />
+      {suggestions.length > 0 && (
+        <div style={{ position:"absolute", top:"100%", left:0, right:0, zIndex:20,
+          background:"white", border:`1px solid ${BORDO_LIGHT}`, borderRadius:6,
+          boxShadow:"0 4px 12px rgba(0,0,0,0.15)", overflow:"hidden" }}>
+          {suggestions.map(s => (
+            <div key={s} onClick={() => select(s)}
+              style={{ padding:"9px 12px", borderBottom:"0.5px solid #eee",
+                cursor:"pointer", fontSize:13, color:BORDO }}>
+              {s}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MisPredicciones({ userId, onBack }: { userId:string, onBack:()=>void }) {
+  const [preds, setPreds] = useState<Record<string,string>>({});
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+  const bloqueado = prediccionesBloqueadas();
+  const fechaCierre = "Jueves 11 de Junio a las 15:00 hs";
+
+  useEffect(() => {
+    getDoc(doc(db, "predicciones", userId)).then(snap => {
+      if (snap.exists()) setPreds(snap.data() as Record<string,string>);
+    });
+  }, [userId]);
+
+  async function guardar() {
+    setSaving(true);
+    await setDoc(doc(db, "predicciones", userId), { ...preds, updatedAt: serverTimestamp() });
+    setMsg("✓ Predicciones guardadas");
+    setSaving(false);
+    setTimeout(() => setMsg(""), 3000);
+  }
+
+  return (
+    <div style={{ padding:12, background:MARFIL_LIGHT, flex:1 }}>
+      <button onClick={onBack} style={{ background:"none", border:"none", color:BORDO,
+        fontSize:12, marginBottom:12, display:"flex", alignItems:"center", gap:4 }}>
+        ← Volver al perfil
+      </button>
+      <div style={{ fontSize:14, fontWeight:600, color:BORDO, marginBottom:4 }}>
+        🏆 Predicciones del torneo
+      </div>
+
+      <div style={{ background: bloqueado ? "#fce4ec" : MARFIL_LIGHT,
+        border:`0.5px solid ${bloqueado ? ROJO : BORDO_LIGHT}`,
+        borderRadius:8, padding:"10px 12px", marginBottom:14, fontSize:11 }}>
+        {bloqueado
+          ? <span style={{ color:ROJO, fontWeight:500 }}>🔒 Las predicciones están cerradas desde el {fechaCierre}. Solo el administrador puede modificarlas.</span>
+          : <span style={{ color:BORDO }}>⏰ Podés editar tus predicciones hasta el <strong>{fechaCierre}</strong>. Después no será posible.</span>
+        }
+      </div>
+
+      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        {PREDICCIONES_CATEGORIAS.map(cat => (
+          <div key={cat.id} style={{ background:"white", borderRadius:12,
+            border:"0.5px solid #e0ddd5", padding:14 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:8 }}>
+              <span style={{ fontSize:18 }}>{cat.emoji}</span>
+              <div>
+                <div style={{ fontSize:13, fontWeight:600, color:BORDO }}>{cat.label}</div>
+                <div style={{ fontSize:10, color:"#888" }}>{cat.pts} puntos si acertás</div>
+              </div>
+            </div>
+            {cat.tipo === "pais" ? (
+              <TeamAutocomplete
+                value={preds[cat.id] || ""}
+                onChange={v => setPreds(p => ({...p, [cat.id]: v}))}
+                placeholder="Buscá un país..."
+              />
+            ) : (
+              <PlayerAutocomplete
+                value={preds[cat.id] || ""}
+                onChange={v => setPreds(p => ({...p, [cat.id]: v}))}
+                categoria={cat.id}
+              />
+            )}
+            {preds[cat.id] && (
+              <div style={{ fontSize:11, color:VERDE, marginTop:4 }}>
+                Tu predicción: <strong>{preds[cat.id]}</strong>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {!bloqueado && (
+        <button onClick={guardar} disabled={saving}
+          style={{ width:"100%", marginTop:14, background:BORDO, color:MARFIL,
+            border:"none", borderRadius:8, padding:12, fontSize:14,
+            fontWeight:600, opacity:saving?0.7:1 }}>
+          {saving ? "Guardando..." : "Guardar predicciones"}
+        </button>
+      )}
+      {msg && <div style={{ color:VERDE, fontSize:12, textAlign:"center", marginTop:8 }}>{msg}</div>}
+    </div>
+  );
+}
 
 function TabTendencias() {
   const [partidos, setPartidos] = useState<any[]>([]);
@@ -706,6 +951,87 @@ return (
           </>
         );
       })()}
+
+      <PrediccionesTorneo />
+    </div>
+  );
+}
+
+function PrediccionesTorneo() {
+  const [preds, setPreds] = useState<Record<string, Record<string,number>>>({});
+  const [usuarios, setUsuarios] = useState<Record<string,string>>({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      getDocs(collection(db, "predicciones")),
+      getDocs(collection(db, "usuarios")),
+    ]).then(([predsSnap, usuariosSnap]) => {
+      const u: Record<string,string> = {};
+      usuariosSnap.docs.forEach(d => { u[d.id] = d.data().nick || "?"; });
+      setUsuarios(u);
+      const p: Record<string, Record<string,number>> = {};
+      predsSnap.docs.forEach(d => {
+        const data = d.data();
+        PREDICCIONES_CATEGORIAS.forEach(cat => {
+          if (data[cat.id]) {
+            if (!p[cat.id]) p[cat.id] = {};
+            p[cat.id][data[cat.id]] = (p[cat.id][data[cat.id]] || 0) + 1;
+          }
+        });
+      });
+      setPreds(p);
+      setLoading(false);
+    });
+  }, []);
+
+  const total = Object.keys(usuarios).length;
+  if (loading || Object.keys(preds).length === 0) return null;
+
+  return (
+    <div style={{ marginTop:10 }}>
+      <div style={{ fontSize:10, fontWeight:700, color:BORDO, marginBottom:8,
+        textTransform:"uppercase", letterSpacing:"0.5px" }}>
+        🏆 Predicciones de la Copa
+      </div>
+      {PREDICCIONES_CATEGORIAS.map(cat => {
+        const votos = preds[cat.id] || {};
+        if (Object.keys(votos).length === 0) return null;
+        const sorted = Object.entries(votos).sort((a,b) => b[1]-a[1]);
+        const top = sorted[0];
+        return (
+          <div key={cat.id} style={{ background:"white", borderRadius:12,
+            border:"0.5px solid #e0ddd5", padding:14, marginBottom:10 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:10 }}>
+              <span style={{ fontSize:16 }}>{cat.emoji}</span>
+              <div style={{ fontSize:11, fontWeight:700, color:BORDO,
+                textTransform:"uppercase", letterSpacing:"0.5px" }}>{cat.label}</div>
+            </div>
+            {sorted.slice(0,3).map(([nombre, votos_n], i) => (
+              <div key={nombre} style={{ display:"flex", alignItems:"center",
+                gap:8, marginBottom:6 }}>
+                <div style={{ width:20, height:20, borderRadius:"50%",
+                  background: i===0?BORDO:MARFIL_LIGHT,
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                  fontSize:10, fontWeight:600, color: i===0?MARFIL:BORDO,
+                  flexShrink:0 }}>{i+1}</div>
+                {cat.tipo === "pais" && <FlagImg pais={nombre} size={16} />}
+                <span style={{ flex:1, fontSize:12, color:"#333" }}>{nombre}</span>
+                <div style={{ display:"flex", alignItems:"center", gap:4 }}>
+                  <div style={{ height:6, width:`${Math.round(votos_n/top[1]*60)}px`,
+                    background: i===0?BORDO:MARFIL_DARK, borderRadius:3 }}/>
+                  <span style={{ fontSize:11, color:"#888" }}>{votos_n}</span>
+                </div>
+              </div>
+            ))}
+            {total > 0 && (
+              <div style={{ fontSize:10, color:"#aaa", marginTop:4 }}>
+                {Object.keys(votos).length} opciones distintas · {Object.values(votos).reduce((a,b)=>a+b,0)} votos
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1391,6 +1717,7 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
 
 function TabPerfil({ user, onLogout, isAdmin }: { user:any, onLogout:()=>void, isAdmin:boolean }) {
   const [showAdmin, setShowAdmin] = useState(false);
+  const [showPredicciones, setShowPredicciones] = useState(false);
   const [nick, setNick] = useState("");
   const [editingNick, setEditingNick] = useState(false);
   const [userData, setUserData] = useState<any>(null);
@@ -1410,6 +1737,7 @@ function TabPerfil({ user, onLogout, isAdmin }: { user:any, onLogout:()=>void, i
   }
 
   if (showAdmin) return <AdminPanel onBack={()=>setShowAdmin(false)} />;
+  if (showPredicciones) return <MisPredicciones userId={user.uid} onBack={()=>setShowPredicciones(false)} />;
 
   return (
     <div style={{ padding:12, background:MARFIL_LIGHT, flex:1 }}>
@@ -1464,6 +1792,22 @@ function TabPerfil({ user, onLogout, isAdmin }: { user:any, onLogout:()=>void, i
             </div>
           ))}
         </div>
+      </div>
+
+      <div onClick={() => setShowPredicciones(true)}
+        style={{ background:"white", borderRadius:12, border:"0.5px solid #e0ddd5",
+          padding:"14px 16px", marginBottom:10, cursor:"pointer",
+          display:"flex", alignItems:"center", gap:12 }}>
+        <span style={{ fontSize:24 }}>🏆</span>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:13, fontWeight:600, color:BORDO }}>Mis predicciones del torneo</div>
+          <div style={{ fontSize:11, color:"#888", marginTop:2 }}>
+            {prediccionesBloqueadas()
+              ? "🔒 Predicciones cerradas"
+              : "Campeón, Balón de Oro, Bota de Oro..."}
+          </div>
+        </div>
+        <span style={{ color:"#ccc", fontSize:16 }}>›</span>
       </div>
 
       <div style={{ fontSize:12, fontWeight:600, color:BORDO, marginBottom:8 }}>⚙️ Cuenta</div>
