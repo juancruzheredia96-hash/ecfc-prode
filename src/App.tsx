@@ -100,7 +100,6 @@ const css = `
   input, select { font-family: 'Barlow', sans-serif; }
 `;
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
 
 function horaART() {
   return new Date().toLocaleTimeString("es-AR", {
@@ -134,7 +133,6 @@ function inputStyle(extra?: object) {
     fontSize:13, background:MARFIL_LIGHT, color:BORDO_DARK, height:34, width:"100%", ...extra };
 }
 
-// ─── Componentes base ────────────────────────────────────────────────────────
 
 function FlagImg({ pais, size=22, showName=false }: { pais: string, size?: number, showName?: boolean }) {
   const code = PAISES[pais];
@@ -168,7 +166,6 @@ function Badge({ pts }: { pts: number|null }) {
   );
 }
 
-// ─── Cálculo de puntos ───────────────────────────────────────────────────────
 
 async function calcularPuntosPredicciones(resultados: Record<string,string>) {
   const predsSnap = await getDocs(collection(db, "predicciones"));
@@ -235,7 +232,6 @@ async function calcularPuntosPredicciones(resultados: Record<string,string>) {
   ));
 }
 
-// ─── Login ───────────────────────────────────────────────────────────────────
 
 function LoginScreen() {
   const [loading, setLoading] = useState(false);
@@ -266,7 +262,6 @@ function LoginScreen() {
   );
 }
 
-// ─── Match Card ──────────────────────────────────────────────────────────────
 
 function MatchCard({ match, userId, lockHoras }: { match: any, userId: string, lockHoras: number }) {
   const [mL, setML] = useState<number|null>(null);
@@ -429,7 +424,6 @@ function MatchCard({ match, userId, lockHoras }: { match: any, userId: string, l
   );
 }
 
-// ─── Tab Partidos ─────────────────────────────────────────────────────────────
 
 function TabPartidos({ userId, lockHoras }: { userId: string, lockHoras: number }) {
   const [partidos, setPartidos] = useState<any[]>([]);
@@ -515,7 +509,6 @@ function TabPartidos({ userId, lockHoras }: { userId: string, lockHoras: number 
   );
 }
 
-// ─── Tab Tabla ────────────────────────────────────────────────────────────────
 
 function TabTabla() {
   const [jugadores, setJugadores] = useState<any[]>([]);
@@ -579,7 +572,6 @@ function TabTabla() {
   );
 }
 
-// ─── Tab Tendencias ───────────────────────────────────────────────────────────
 
 function prediccionesBloqueadas(): boolean {
   return new Date() >= FECHA_CIERRE_PREDICCIONES;
@@ -1123,7 +1115,6 @@ function PrediccionesTorneo() {
   );
 }
 
-// ─── Admin ────────────────────────────────────────────────────────────────────
 
 function ImportarCSV({ onClose }: { onClose: ()=>void }) {
   const [loading, setLoading] = useState(false);
@@ -1883,7 +1874,6 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
   );
 }
 
-// ─── Tab Perfil ───────────────────────────────────────────────────────────────
 
 function TabPerfil({ user, onLogout, isAdmin }: { user:any, onLogout:()=>void, isAdmin:boolean }) {
   const [showAdmin, setShowAdmin] = useState(false);
@@ -2000,7 +1990,6 @@ function TabPerfil({ user, onLogout, isAdmin }: { user:any, onLogout:()=>void, i
   );
 }
 
-// ─── App Principal ────────────────────────────────────────────────────────────
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("partidos");
