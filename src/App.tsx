@@ -340,7 +340,7 @@ function TabPartidos({ userId, lockHoras }: { userId: string, lockHoras: number 
   );
 
   return (
-    <div style={{ display:"flex", flexDirection:"column", background:MARFIL_LIGHT, flex:1 }}>
+    <div style={{ display:"flex", flexDirection:"column", background:MARFIL_LIGHT, flex:1, overflow:"hidden" }}>
       <div style={{ padding:"10px 12px 6px", background:MARFIL_LIGHT, flexShrink:0 }}>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
           background:BORDO, borderRadius:8, padding:"8px 12px" }}>
