@@ -170,7 +170,41 @@ function Badge({ pts }: { pts: number|null }) {
 
 // ─── Cálculo de puntos ───────────────────────────────────────────────────────
 
-async function calcularPuntosPartido(matchId: string, gL: number, gV: number) {
+async function calcularPuntosPredicciones(resultados: Record<string,string>) {
+  const predsSnap = await getDocs(collection(db, "predicciones"));
+  for (const pDoc of predsSnap.docs) {
+    const userId = pDoc.id;
+    const data = pDoc.data();
+    let ptsTotales = 0;
+    const aciertos: string[] = [];
+    for (const cat of PREDICCIONES_CATEGORIAS) {
+      if (data[cat.id] && resultados[cat.id] &&
+          data[cat.id].toLowerCase().trim() === resultados[cat.id].toLowerCase().trim()) {
+        ptsTotales += cat.pts;
+        aciertos.push(cat.id);
+      }
+    }
+    if (ptsTotales > 0) {
+      const userRef = doc(db, "usuarios", userId);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        const ud = userSnap.data();
+        await setDoc(userRef, {
+          pts: (ud.pts || 0) + ptsTotales,
+          hoy: (ud.hoy || 0) + ptsTotales,
+        }, { merge: true });
+      }
+      await setDoc(pDoc.ref, { aciertos, ptsGanados: ptsTotales }, { merge: true });
+    }
+  }
+  await setDoc(doc(db, "config", "resultados_premios"), {
+    ...resultados,
+    calculado: true,
+    updatedAt: serverTimestamp()
+  });
+}
+
+
   const pronosSnap = await getDocs(collection(db, "pronosticos"));
   const delPartido = pronosSnap.docs.filter(d => d.data().matchId === matchId);
   for (const pDoc of delPartido) {
@@ -607,12 +641,23 @@ function MisPredicciones({ userId, onBack }: { userId:string, onBack:()=>void })
   const [preds, setPreds] = useState<Record<string,string>>({});
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
+  const [resultadosOficiales, setResultadosOficiales] = useState<Record<string,string>>({});
+  const [misAciertos, setMisAciertos] = useState<string[]>([]);
   const bloqueado = prediccionesBloqueadas();
   const fechaCierre = "Jueves 11 de Junio a las 15:00 hs";
 
   useEffect(() => {
     getDoc(doc(db, "predicciones", userId)).then(snap => {
-      if (snap.exists()) setPreds(snap.data() as Record<string,string>);
+      if (snap.exists()) {
+        const data = snap.data();
+        setPreds(data as Record<string,string>);
+        setMisAciertos(data.aciertos || []);
+      }
+    });
+    getDoc(doc(db, "config", "resultados_premios")).then(snap => {
+      if (snap.exists() && snap.data().calculado) {
+        setResultadosOficiales(snap.data() as Record<string,string>);
+      }
     });
   }, [userId]);
 
@@ -675,6 +720,46 @@ function MisPredicciones({ userId, onBack }: { userId:string, onBack:()=>void })
           </div>
         ))}
       </div>
+
+      {Object.keys(resultadosOficiales).length > 0 && (
+        <div style={{ background:"white", borderRadius:12, border:`1.5px solid ${VERDE}`,
+          padding:14, marginTop:14 }}>
+          <div style={{ fontSize:12, fontWeight:600, color:VERDE, marginBottom:10 }}>
+            🏆 Resultados oficiales
+          </div>
+          {PREDICCIONES_CATEGORIAS.map(cat => {
+            const ganador = resultadosOficiales[cat.id];
+            if (!ganador) return null;
+            const acerte = misAciertos.includes(cat.id);
+            return (
+              <div key={cat.id} style={{ display:"flex", alignItems:"center",
+                gap:8, padding:"7px 0", borderBottom:"0.5px solid #eee" }}>
+                <span style={{ fontSize:14 }}>{cat.emoji}</span>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:10, color:"#888" }}>{cat.label}</div>
+                  <div style={{ fontSize:12, fontWeight:600, color:"#111" }}>{ganador}</div>
+                </div>
+                {acerte
+                  ? <span style={{ background:VERDE, color:"white", fontSize:10,
+                      padding:"2px 8px", borderRadius:20, fontWeight:600 }}>
+                      +{cat.pts} ✓
+                    </span>
+                  : preds[cat.id]
+                    ? <span style={{ background:"#eee", color:"#888", fontSize:10,
+                        padding:"2px 8px", borderRadius:20 }}>
+                        {preds[cat.id]}
+                      </span>
+                    : null
+                }
+              </div>
+            );
+          })}
+          <div style={{ fontSize:11, color:VERDE, fontWeight:600, marginTop:8, textAlign:"center" }}>
+            Acertaste {misAciertos.length} de {PREDICCIONES_CATEGORIAS.length} premios
+            {" "}(+{misAciertos.reduce((acc, id) => acc + (PREDICCIONES_CATEGORIAS.find(c=>c.id===id)?.pts||0), 0)} pts)
+          </div>
+        </div>
+      )}
 
       {!bloqueado && (
         <button onClick={guardar} disabled={saving}
@@ -1009,7 +1094,7 @@ function PrediccionesTorneo() {
               <div style={{ fontSize:11, fontWeight:700, color:BORDO,
                 textTransform:"uppercase", letterSpacing:"0.5px" }}>{cat.label}</div>
             </div>
-            {sorted.slice(0,3).map(([nombre, votos_n], i) => (
+            {sorted.slice(0, cat.id === "campeon" ? 5 : 3).map(([nombre, votos_n], i) => (
               <div key={nombre} style={{ display:"flex", alignItems:"center",
                 gap:8, marginBottom:6 }}>
                 <div style={{ width:20, height:20, borderRadius:"50%",
@@ -1362,7 +1447,87 @@ function FormResultado({ partidos, onClose }: { partidos:any[], onClose:()=>void
   );
 }
 
-function GestionAdmins({ onBack }: { onBack: ()=>void }) {
+function ResultadosPremios({ onClose }: { onClose:()=>void }) {
+  const [resultados, setResultados] = useState<Record<string,string>>({});
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [yaCalculado, setYaCalculado] = useState(false);
+
+  useEffect(() => {
+    getDoc(doc(db, "config", "resultados_premios")).then(snap => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setResultados(data);
+        setYaCalculado(data.calculado === true);
+      }
+    });
+  }, []);
+
+  async function guardarYCalcular() {
+    const sinCompletar = PREDICCIONES_CATEGORIAS.filter(c => !resultados[c.id]);
+    if (sinCompletar.length > 0) {
+      setMsg(`Falta cargar: ${sinCompletar.map(c => c.label).join(", ")}`);
+      return;
+    }
+    setSaving(true);
+    setMsg("Calculando puntos...");
+    await calcularPuntosPredicciones(resultados);
+    setMsg("✓ Resultados guardados y puntos calculados");
+    setYaCalculado(true);
+    setSaving(false);
+  }
+
+  return (
+    <div style={{ background:"white", borderRadius:12, border:"0.5px solid #e0ddd5", padding:14, marginBottom:10 }}>
+      <div style={{ fontSize:12, fontWeight:600, color:BORDO, marginBottom:10 }}>🏆 Resultados de premios</div>
+      {yaCalculado && (
+        <div style={{ background:"#e8f5e9", borderRadius:6, padding:"8px 10px",
+          fontSize:11, color:VERDE, marginBottom:10 }}>
+          ✓ Ya se calcularon los puntos. Podés actualizar si hay correcciones.
+        </div>
+      )}
+      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        {PREDICCIONES_CATEGORIAS.map(cat => (
+          <div key={cat.id}>
+            <div style={{ fontSize:10, color:"#888", marginBottom:3 }}>
+              {cat.emoji} {cat.label} ({cat.pts} pts)
+            </div>
+            {cat.tipo === "pais" ? (
+              <TeamAutocomplete
+                value={resultados[cat.id] || ""}
+                onChange={v => setResultados(r => ({...r, [cat.id]: v}))}
+                placeholder="Buscá el país ganador..."
+              />
+            ) : (
+              <PlayerAutocomplete
+                value={resultados[cat.id] || ""}
+                onChange={v => setResultados(r => ({...r, [cat.id]: v}))}
+                categoria={cat.id}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+      {msg && (
+        <div style={{ fontSize:11, color: msg.startsWith("✓")?VERDE:ROJO,
+          marginTop:10, textAlign:"center" }}>{msg}</div>
+      )}
+      <div style={{ display:"flex", gap:8, marginTop:12 }}>
+        <button onClick={onClose} style={{ flex:1, background:"none",
+          border:`1px solid #ccc`, borderRadius:6, padding:9, fontSize:12, color:"#111" }}>
+          Cancelar
+        </button>
+        <button onClick={guardarYCalcular} disabled={saving}
+          style={{ flex:2, background:BORDO, color:MARFIL, border:"none",
+            borderRadius:6, padding:9, fontSize:12, fontWeight:600, opacity:saving?0.7:1 }}>
+          {saving ? "Calculando..." : "Guardar y calcular puntos"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
@@ -1451,7 +1616,7 @@ function GestionAdmins({ onBack }: { onBack: ()=>void }) {
 
 function AdminPanel({ onBack }: { onBack:()=>void }) {
   const [partidos, setPartidos] = useState<any[]>([]);
-  const [vista, setVista] = useState<"menu"|"nuevo"|"resultado"|"lista"|"csv"|"admins"|"equipos">("menu");
+  const [vista, setVista] = useState<"menu"|"nuevo"|"resultado"|"lista"|"csv"|"admins"|"equipos"|"premios">("menu");
   const [editando, setEditando] = useState<any>(null);
   const [confirmDelete, setConfirmDelete] = useState<string|null>(null);
   const [confirmBorrarTodo, setConfirmBorrarTodo] = useState(false);
@@ -1556,6 +1721,8 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
         <GestionAdmins onBack={() => setVista("menu")} />
       ) : vista==="equipos" ? (
         <GestionEquipos onBack={() => setVista("menu")} />
+      ) : vista==="premios" ? (
+        <ResultadosPremios onClose={() => setVista("menu")} />
       ) : vista==="csv" ? (
         <ImportarCSV onClose={()=>setVista("menu")} />
       ) : vista==="lista" ? (
@@ -1655,6 +1822,7 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
               { icon:"➕", label:"Agregar partido", sub:"Cargar uno por uno", action:()=>setVista("nuevo") },
               { icon:"📋", label:`Ver partidos (${partidos.length})`, sub:"Editar o eliminar", action:()=>setVista("lista") },
               { icon:"✏️", label:"Cargar resultado", sub:"Actualizar marcador real", action:()=>setVista("resultado") },
+              { icon:"🏆", label:"Resultados de premios", sub:"Balón, Bota, Guante, Joven, Campeón", action:()=>setVista("premios") },
               { icon:"🗑️", label:"Eliminar todos", sub:"Borra todo y empezá de nuevo", danger:true, action:()=>setConfirmBorrarTodo(true) },
             ].map((row,i,arr)=>(
               <div key={row.label} onClick={row.action} style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderBottom:i<arr.length-1?"0.5px solid #eee":"none", cursor:"pointer" }}>
