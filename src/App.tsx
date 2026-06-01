@@ -326,13 +326,13 @@ function TabPartidos({ userId, lockHoras }: { userId: string, lockHoras: number 
   }
 
   if (loading) return (
-    <div style={{ padding:40, textAlign:"center", color:"#888", background:MARFIL_LIGHT, minHeight:"70vh" }}>
+    <div style={{ padding:40, textAlign:"center", color:"#888", background:MARFIL_LIGHT, flex:1 }}>
       Cargando partidos...
     </div>
   );
 
   if (partidos.length === 0) return (
-    <div style={{ padding:32, textAlign:"center", background:MARFIL_LIGHT, minHeight:"70vh" }}>
+    <div style={{ padding:32, textAlign:"center", background:MARFIL_LIGHT, flex:1 }}>
       <div style={{ fontSize:40, marginBottom:12 }}>⚽</div>
       <div style={{ fontSize:14, color:BORDO, fontWeight:600 }}>No hay partidos cargados</div>
       <div style={{ fontSize:12, color:"#888", marginTop:4 }}>El administrador debe cargar los partidos</div>
@@ -340,7 +340,7 @@ function TabPartidos({ userId, lockHoras }: { userId: string, lockHoras: number 
   );
 
   return (
-    <div style={{ display:"flex", flexDirection:"column", background:MARFIL_LIGHT, minHeight:"70vh" }}>
+    <div style={{ display:"flex", flexDirection:"column", background:MARFIL_LIGHT, flex:1 }}>
       <div style={{ padding:"10px 12px 6px", background:MARFIL_LIGHT, flexShrink:0 }}>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
           background:BORDO, borderRadius:8, padding:"8px 12px" }}>
@@ -390,7 +390,7 @@ function TabTabla() {
   }, []);
 
   return (
-    <div style={{ padding:12, background:MARFIL_LIGHT, minHeight:"70vh" }}>
+    <div style={{ padding:12, background:MARFIL_LIGHT, flex:1 }}>
       <div style={{ background:"white", borderRadius:12, border:"0.5px solid #e0ddd5", overflow:"hidden" }}>
         <div style={{ background:BORDO, padding:"10px 12px" }}>
           <div style={{ color:MARFIL, fontSize:12, fontWeight:600 }}>Tabla de posiciones</div>
@@ -567,7 +567,7 @@ function TabTendencias() {
   }
 
 return (
-    <div style={{ padding:12, background:MARFIL_LIGHT, minHeight:"70vh" }}>
+    <div style={{ padding:12, background:MARFIL_LIGHT, flex:1 }}>
       <select value={selectedId} onChange={e => setSelectedId(e.target.value)}
         style={{ width:"100%", padding:"9px 12px", border:`1.5px solid ${BORDO_LIGHT}`,
           borderRadius:8, fontSize:12, color:BORDO, background:MARFIL_LIGHT, marginBottom:10 }}>
@@ -881,7 +881,7 @@ function GestionEquipos({ onBack }: { onBack:()=>void }) {
   }
 
   return (
-    <div style={{ padding:12, background:MARFIL_LIGHT, minHeight:"70vh" }}>
+    <div style={{ padding:12, background:MARFIL_LIGHT, flex:1 }}>
       <button onClick={onBack} style={{ background:"none", border:"none", color:BORDO,
         fontSize:12, marginBottom:12, display:"flex", alignItems:"center", gap:4 }}>
         ← Volver al panel
@@ -1057,7 +1057,7 @@ function GestionAdmins({ onBack }: { onBack: ()=>void }) {
   const admins = usuarios.filter(u => u.isAdmin);
 
   return (
-    <div style={{ padding:12, background:MARFIL_LIGHT, minHeight:"70vh" }}>
+    <div style={{ padding:12, background:MARFIL_LIGHT, flex:1 }}>
       <button onClick={onBack} style={{ background:"none", border:"none", color:BORDO,
         fontSize:12, marginBottom:12, display:"flex", alignItems:"center", gap:4 }}>
         ← Volver al panel
@@ -1214,7 +1214,7 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
   }
 
   return (
-    <div style={{ padding:12, background:MARFIL_LIGHT, minHeight:"70vh" }}>
+    <div style={{ padding:12, background:MARFIL_LIGHT, flex:1 }}>
       <button onClick={onBack} style={{ background:"none", border:"none", color:BORDO, fontSize:12, marginBottom:12, display:"flex", alignItems:"center", gap:4 }}>← Volver al perfil</button>
       <div style={{ fontSize:12, fontWeight:600, color:BORDO, marginBottom:10 }}>🛡️ Panel de administrador</div>
 
@@ -1412,7 +1412,7 @@ function TabPerfil({ user, onLogout, isAdmin }: { user:any, onLogout:()=>void, i
   if (showAdmin) return <AdminPanel onBack={()=>setShowAdmin(false)} />;
 
   return (
-    <div style={{ padding:12, background:MARFIL_LIGHT, minHeight:"70vh" }}>
+    <div style={{ padding:12, background:MARFIL_LIGHT, flex:1 }}>
       <div style={{ background:"white", borderRadius:12, border:"0.5px solid #e0ddd5",
         padding:"20px 16px", marginBottom:10, display:"flex", flexDirection:"column",
         alignItems:"center", gap:10 }}>
