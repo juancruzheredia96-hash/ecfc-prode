@@ -202,6 +202,7 @@ async function calcularPuntosPredicciones(resultados: Record<string,string>) {
 }
 
 
+async function calcularPuntosPartido(matchId: string, gL: number, gV: number) {
   const pronosSnap = await getDocs(collection(db, "pronosticos"));
   const delPartido = pronosSnap.docs.filter(d => d.data().matchId === matchId);
   for (const pDoc of delPartido) {
@@ -1518,7 +1519,7 @@ function ResultadosPremios({ onClose }: { onClose:()=>void }) {
   );
 }
 
-
+function GestionAdmins({ onBack }: { onBack: ()=>void }) {
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
