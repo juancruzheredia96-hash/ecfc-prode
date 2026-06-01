@@ -56,7 +56,7 @@ const PAISES: Record<string, string> = {
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Barlow', sans-serif; background: var(--marfil-light, #f0ece0); min-height: 100vh; display: flex; justify-content: center; }
+  body { font-family: 'Barlow', sans-serif; background: #f0ece0; min-height: 100vh; display: flex; justify-content: center; margin: 0; }
   input[type=number]::-webkit-inner-spin-button,
   input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   input[type=number] { -moz-appearance: textfield; }
@@ -1536,7 +1536,7 @@ export default function App() {
   return (
     <>
       <style>{css}</style>
-      <div style={{ width:"100%", maxWidth:480, background:"white", height:"100vh",
+      <div style={{ width:"100%", maxWidth:600, background:"white", height:"100vh",
         display:"flex", flexDirection:"column" }}>
         <div style={{ background:BORDO, padding:"10px 20px 6px",
           display:"flex", justifyContent:"space-between", flexShrink:0 }}>
