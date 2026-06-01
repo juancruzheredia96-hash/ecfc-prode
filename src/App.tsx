@@ -1345,7 +1345,7 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
             <div style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderBottom:"0.5px solid #eee", cursor:"pointer" }} onClick={() => setVista("admins")}>
               <span style={{ fontSize:16 }}>🛡️</span>
               <div style={{ flex:1 }}>
-                <div style={{ fontSize:12, fontWeight:500 }}>Asignar administradores</div>
+                <div style={{ fontSize:12, fontWeight:500, color:"#111" }}>Asignar administradores</div>
                 <div style={{ fontSize:10, color:"#888" }}>Hasta 5 admins en total</div>
               </div>
               <span style={{ color:"#ccc", fontSize:16 }}>›</span>
@@ -1353,7 +1353,7 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
             <div style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderBottom:"0.5px solid #eee", cursor:"pointer" }} onClick={() => setVista("equipos")}>
               <span style={{ fontSize:16 }}>🏟️</span>
               <div style={{ flex:1 }}>
-                <div style={{ fontSize:12, fontWeight:500 }}>Gestión de equipos</div>
+                <div style={{ fontSize:12, fontWeight:500, color:"#111" }}>Gestión de equipos</div>
                 <div style={{ fontSize:10, color:"#888" }}>Para futuros prodes (Champions, ligas...)</div>
               </div>
               <span style={{ color:"#ccc", fontSize:16 }}>›</span>
@@ -1364,7 +1364,7 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
                   <div style={{ fontSize:12, color:BORDO, fontWeight:500, marginBottom:6 }}>¿Cerrar jornada y resetear +Hoy para todos?</div>
                   <div style={{ fontSize:10, color:"#888", marginBottom:10 }}>Los puntos totales no cambian.</div>
                   <div style={{ display:"flex", gap:8 }}>
-                    <button onClick={()=>setConfirmCerrarJornada(false)} style={{ flex:1, background:"none", border:"1px solid #ccc", borderRadius:6, padding:8, fontSize:12 }}>Cancelar</button>
+                    <button onClick={()=>setConfirmCerrarJornada(false)} style={{ flex:1, background:"none", border:"1px solid #ccc", borderRadius:6, padding:8, fontSize:12, color:"#111" }}>Cancelar</button>
                     <button onClick={cerrarJornada} disabled={loading} style={{ flex:1, background:BORDO, color:MARFIL, border:"none", borderRadius:6, padding:8, fontSize:12, fontWeight:600 }}>
                       {loading?"Cerrando...":"Cerrar jornada"}</button>
                   </div>
@@ -1373,7 +1373,7 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
                 <div style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }} onClick={()=>setConfirmCerrarJornada(true)}>
                   <span style={{ fontSize:16 }}>🏁</span>
                   <div style={{ flex:1 }}>
-                    <div style={{ fontSize:12, fontWeight:500 }}>Cerrar jornada</div>
+                    <div style={{ fontSize:12, fontWeight:500, color:"#111" }}>Cerrar jornada</div>
                     <div style={{ fontSize:10, color:"#888" }}>Resetea el +Hoy de todos</div>
                   </div>
                   <span style={{ color:"#ccc", fontSize:16 }}>›</span>
@@ -1536,7 +1536,7 @@ export default function App() {
   return (
     <>
       <style>{css}</style>
-      <div style={{ width:"100%", maxWidth:480, background:"white", minHeight:"100vh",
+      <div style={{ width:"100%", maxWidth:480, background:"white", height:"100vh",
         display:"flex", flexDirection:"column" }}>
         <div style={{ background:BORDO, padding:"10px 20px 6px",
           display:"flex", justifyContent:"space-between", flexShrink:0 }}>
