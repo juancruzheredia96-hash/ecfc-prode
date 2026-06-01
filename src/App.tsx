@@ -1252,7 +1252,7 @@ function TeamAutocomplete({ value, onChange, placeholder }: { value:string, onCh
           background:"white", border:`1px solid ${BORDO_LIGHT}`, borderRadius:6,
           boxShadow:"0 4px 12px rgba(0,0,0,0.15)", overflow:"hidden" }}>
           {suggestions.map(s => (
-            <div key={s} onClick={() => select(s)}
+            <div key={s} onMouseDown={e => { e.preventDefault(); select(s); }}
               style={{ display:"flex", alignItems:"center", gap:8, padding:"9px 12px",
                 borderBottom:"0.5px solid #eee", cursor:"pointer" }}>
               <FlagImg pais={s} size={18} />
