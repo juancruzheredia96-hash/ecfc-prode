@@ -340,8 +340,8 @@ function TabPartidos({ userId, lockHoras }: { userId: string, lockHoras: number 
   );
 
   return (
-    <div style={{ background:MARFIL_LIGHT, minHeight:"70vh", position:"relative" }}>
-      <div style={{ position:"sticky", top:0, zIndex:10, padding:"10px 12px 6px", background:MARFIL_LIGHT }}>
+    <div style={{ display:"flex", flexDirection:"column", background:MARFIL_LIGHT, minHeight:"70vh" }}>
+      <div style={{ padding:"10px 12px 6px", background:MARFIL_LIGHT, flexShrink:0 }}>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
           background:BORDO, borderRadius:8, padding:"8px 12px" }}>
           <button onClick={() => setCurrentDay(d => Math.max(0,d-1))} disabled={currentDay===0}
@@ -359,16 +359,15 @@ function TabPartidos({ userId, lockHoras }: { userId: string, lockHoras: number 
               padding:"0 8px", opacity:currentDay===dias.length-1?0.3:1, cursor:"pointer" }}>›</button>
         </div>
       </div>
-
-      <div style={{ position:"relative", padding:"0 12px 12px" }}>
+      <div style={{ flex:1, overflowY:"auto", padding:"0 12px 12px", position:"relative" }}>
         <div
           onClick={() => setCurrentDay(d => Math.max(0,d-1))}
-          style={{ position:"fixed", left:0, top:"30%", width:40, height:"40%",
-            zIndex:5, cursor:"pointer", opacity:0 }} />
+          style={{ position:"fixed", left:0, top:"20%", width:40, height:"60%",
+            zIndex:5, cursor:"pointer" }} />
         <div
           onClick={() => setCurrentDay(d => Math.min(dias.length-1,d+1))}
-          style={{ position:"fixed", right:0, top:"30%", width:40, height:"40%",
-            zIndex:5, cursor:"pointer", opacity:0 }} />
+          style={{ position:"fixed", right:0, top:"20%", width:40, height:"60%",
+            zIndex:5, cursor:"pointer" }} />
         {matchesDelDia.map(m => (
           <MatchCard key={m.id} match={m} userId={userId} lockHoras={lockHoras} />
         ))}
@@ -1291,7 +1290,7 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
             <div onClick={exportarCSV} style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderBottom:"0.5px solid #eee", cursor:"pointer" }}>
               <span style={{ fontSize:16 }}>⬇️</span>
               <div style={{ flex:1 }}>
-                <div style={{ fontSize:12, fontWeight:500 }}>Exportar resultados CSV</div>
+                <div style={{ fontSize:12, fontWeight:500, color:"#111" }}>Exportar resultados CSV</div>
                 <div style={{ fontSize:10, color:"#888" }}>Descarga pronósticos y puntajes</div>
               </div>
               <span style={{ color:"#ccc", fontSize:16 }}>›</span>
@@ -1565,7 +1564,7 @@ export default function App() {
           </div>
         </div>
 
-        <div style={{ flex:1, overflowY:"auto" }}>
+        <div style={{ flex:1, overflowY:"auto", display:"flex", flexDirection:"column" }}>
           {authLoading
             ? <div style={{ padding:40, textAlign:"center", color:"#aaa", background:MARFIL_LIGHT }}>Cargando...</div>
             : !user
