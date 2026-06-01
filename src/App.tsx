@@ -111,7 +111,7 @@ function FlagImg({ pais, size=22, showName=false }: { pais: string, size?: numbe
   return (
     <div style={{ display:"flex", alignItems:"center", gap:6 }}>
       {flag}
-      <span style={{ fontSize:13, fontWeight:600, color:BORDO }}>{pais}</span>
+      <span style={{ fontSize:11, fontWeight:600, color:BORDO }}>{pais}</span>
     </div>
   );
 }
@@ -427,7 +427,7 @@ function TabTabla() {
                   : <span style={{ fontSize:11, fontWeight:500, color:BORDO }}>{(j.ini||"?").slice(0,2)}</span>
                 }
               </div>
-              <span style={{ flex:1, fontSize:13, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", paddingRight:4 }}>{j.nick||"Usuario"}</span>
+              <span style={{ flex:1, fontSize:13, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", paddingRight:4, color:"#111" }}>{j.nick||"Usuario"}</span>
               <span style={{ fontSize:14, fontWeight:600, color:MARFIL, background:BORDO,
                 padding:"2px 7px", borderRadius:3, minWidth:30, textAlign:"center" }}>{j.pts||0}</span>
               <span style={{ fontSize:11, color:VERDE, minWidth:28, textAlign:"right" }}>+{j.hoy||0}</span>
