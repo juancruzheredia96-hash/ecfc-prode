@@ -56,7 +56,7 @@ const PAISES: Record<string, string> = {
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Barlow', sans-serif; background: #1a1a1a; min-height: 100vh; display: flex; justify-content: center; }
+  body { font-family: 'Barlow', sans-serif; background: #f0ece0; min-height: 100vh; display: flex; justify-content: center; margin: 0; }
   input[type=number]::-webkit-inner-spin-button,
   input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   input[type=number] { -moz-appearance: textfield; }
@@ -100,13 +100,19 @@ function inputStyle(extra?: object) {
 
 // ─── Componentes base ────────────────────────────────────────────────────────
 
-function FlagImg({ pais, size=24 }: { pais: string, size?: number }) {
+function FlagImg({ pais, size=22, showName=false }: { pais: string, size?: number, showName?: boolean }) {
   const code = PAISES[pais];
-  if (!code) return <span style={{ fontSize:size }}>🏳️</span>;
+  const flag = code
+    ? <img src={`https://flagcdn.com/w40/${code}.png`} alt={pais}
+        style={{ width:size, height:"auto", borderRadius:2, objectFit:"cover", flexShrink:0 }}
+        onError={e => { (e.target as HTMLImageElement).style.display="none"; }} />
+    : <span style={{ fontSize:size }}>🏳️</span>;
+  if (!showName) return flag;
   return (
-    <img src={`https://flagcdn.com/w40/${code}.png`} alt={pais}
-      style={{ width:size, height:"auto", borderRadius:2, objectFit:"cover" }}
-      onError={e => { (e.target as HTMLImageElement).style.display="none"; }} />
+    <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+      {flag}
+      <span style={{ fontSize:11, fontWeight:600, color:BORDO }}>{pais}</span>
+    </div>
   );
 }
 
@@ -229,8 +235,7 @@ function MatchCard({ match, userId, lockHoras }: { match: any, userId: string, l
       </div>
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:4 }}>
         <div style={{ display:"flex", alignItems:"center", gap:5, flex:1 }}>
-          <FlagImg pais={match.localN} size={22} />
-          <span style={{ fontSize:12, fontWeight:500 }}>{match.localN}</span>
+          <FlagImg pais={match.localN} size={22} showName={true} />
         </div>
         <div style={{ minWidth:72, display:"flex", justifyContent:"center" }}>
           {hasResult
@@ -244,8 +249,7 @@ function MatchCard({ match, userId, lockHoras }: { match: any, userId: string, l
           }
         </div>
         <div style={{ display:"flex", alignItems:"center", gap:5, flex:1, flexDirection:"row-reverse" }}>
-          <FlagImg pais={match.visitaN} size={22} />
-          <span style={{ fontSize:12, fontWeight:500, textAlign:"right" }}>{match.visitaN}</span>
+          <FlagImg pais={match.visitaN} size={22} showName={true} />
         </div>
       </div>
       <div style={{ borderTop:"0.5px solid #eee", paddingTop:8, marginTop:8 }}>
@@ -322,13 +326,13 @@ function TabPartidos({ userId, lockHoras }: { userId: string, lockHoras: number 
   }
 
   if (loading) return (
-    <div style={{ padding:40, textAlign:"center", color:"#888", background:MARFIL_LIGHT, minHeight:"70vh" }}>
+    <div style={{ padding:40, textAlign:"center", color:"#888", background:MARFIL_LIGHT, flex:1 }}>
       Cargando partidos...
     </div>
   );
 
   if (partidos.length === 0) return (
-    <div style={{ padding:32, textAlign:"center", background:MARFIL_LIGHT, minHeight:"70vh" }}>
+    <div style={{ padding:32, textAlign:"center", background:MARFIL_LIGHT, flex:1 }}>
       <div style={{ fontSize:40, marginBottom:12 }}>⚽</div>
       <div style={{ fontSize:14, color:BORDO, fontWeight:600 }}>No hay partidos cargados</div>
       <div style={{ fontSize:12, color:"#888", marginTop:4 }}>El administrador debe cargar los partidos</div>
@@ -336,26 +340,38 @@ function TabPartidos({ userId, lockHoras }: { userId: string, lockHoras: number 
   );
 
   return (
-    <div style={{ padding:12, background:MARFIL_LIGHT, minHeight:"70vh" }}>
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
-        background:BORDO, borderRadius:8, padding:"8px 12px", marginBottom:10 }}>
-        <button onClick={() => setCurrentDay(d => Math.max(0,d-1))} disabled={currentDay===0}
-          style={{ background:"none", border:"none", color:MARFIL, fontSize:20,
-            padding:"0 4px", opacity:currentDay===0?0.3:1 }}>‹</button>
-        <div style={{ textAlign:"center" }}>
-          <div style={{ color:MARFIL, fontSize:13, fontWeight:600 }}>{formatFecha(diaActual)}</div>
-          <div style={{ color:MARFIL_DARK, fontSize:10 }}>
-            {matchesDelDia[0]?.fase} · {matchesDelDia.length} partido{matchesDelDia.length!==1?"s":""}
+    <div style={{ display:"flex", flexDirection:"column", background:MARFIL_LIGHT, flex:1, overflow:"hidden" }}>
+      <div style={{ padding:"10px 12px 6px", background:MARFIL_LIGHT, flexShrink:0 }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
+          background:BORDO, borderRadius:8, padding:"8px 12px" }}>
+          <button onClick={() => setCurrentDay(d => Math.max(0,d-1))} disabled={currentDay===0}
+            style={{ background:"none", border:"none", color:MARFIL, fontSize:22,
+              padding:"0 8px", opacity:currentDay===0?0.3:1, cursor:"pointer" }}>‹</button>
+          <div style={{ textAlign:"center" }}>
+            <div style={{ color:MARFIL, fontSize:13, fontWeight:600 }}>{formatFecha(diaActual)}</div>
+            <div style={{ color:MARFIL_DARK, fontSize:10 }}>
+              {matchesDelDia[0]?.fase} · {matchesDelDia.length} partido{matchesDelDia.length!==1?"s":""}
+            </div>
           </div>
+          <button onClick={() => setCurrentDay(d => Math.min(dias.length-1,d+1))}
+            disabled={currentDay===dias.length-1}
+            style={{ background:"none", border:"none", color:MARFIL, fontSize:22,
+              padding:"0 8px", opacity:currentDay===dias.length-1?0.3:1, cursor:"pointer" }}>›</button>
         </div>
-        <button onClick={() => setCurrentDay(d => Math.min(dias.length-1,d+1))}
-          disabled={currentDay===dias.length-1}
-          style={{ background:"none", border:"none", color:MARFIL, fontSize:20,
-            padding:"0 4px", opacity:currentDay===dias.length-1?0.3:1 }}>›</button>
       </div>
-      {matchesDelDia.map(m => (
-        <MatchCard key={m.id} match={m} userId={userId} lockHoras={lockHoras} />
-      ))}
+      <div style={{ flex:1, overflowY:"auto", padding:"0 12px 12px", position:"relative" }}>
+        <div
+          onClick={() => setCurrentDay(d => Math.max(0,d-1))}
+          style={{ position:"fixed", left:0, top:"20%", width:40, height:"60%",
+            zIndex:5, cursor:"pointer" }} />
+        <div
+          onClick={() => setCurrentDay(d => Math.min(dias.length-1,d+1))}
+          style={{ position:"fixed", right:0, top:"20%", width:40, height:"60%",
+            zIndex:5, cursor:"pointer" }} />
+        {matchesDelDia.map(m => (
+          <MatchCard key={m.id} match={m} userId={userId} lockHoras={lockHoras} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -374,7 +390,7 @@ function TabTabla() {
   }, []);
 
   return (
-    <div style={{ padding:12, background:MARFIL_LIGHT, minHeight:"70vh" }}>
+    <div style={{ padding:12, background:MARFIL_LIGHT, flex:1 }}>
       <div style={{ background:"white", borderRadius:12, border:"0.5px solid #e0ddd5", overflow:"hidden" }}>
         <div style={{ background:BORDO, padding:"10px 12px" }}>
           <div style={{ color:MARFIL, fontSize:12, fontWeight:600 }}>Tabla de posiciones</div>
@@ -411,7 +427,7 @@ function TabTabla() {
                   : <span style={{ fontSize:11, fontWeight:500, color:BORDO }}>{(j.ini||"?").slice(0,2)}</span>
                 }
               </div>
-              <span style={{ flex:1, fontSize:13, paddingRight:4, color:"#111" }}>{j.nick||"Usuario"}</span>
+              <span style={{ flex:1, fontSize:13, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", paddingRight:4, color:"#111" }}>{j.nick||"Usuario"}</span>
               <span style={{ fontSize:14, fontWeight:600, color:MARFIL, background:BORDO,
                 padding:"2px 7px", borderRadius:3, minWidth:30, textAlign:"center" }}>{j.pts||0}</span>
               <span style={{ fontSize:11, color:VERDE, minWidth:28, textAlign:"right" }}>+{j.hoy||0}</span>
@@ -551,7 +567,7 @@ function TabTendencias() {
   }
 
 return (
-    <div style={{ padding:12, background:MARFIL_LIGHT, minHeight:"70vh" }}>
+    <div style={{ padding:12, background:MARFIL_LIGHT, flex:1 }}>
       <select value={selectedId} onChange={e => setSelectedId(e.target.value)}
         style={{ width:"100%", padding:"9px 12px", border:`1.5px solid ${BORDO_LIGHT}`,
           borderRadius:8, fontSize:12, color:BORDO, background:MARFIL_LIGHT, marginBottom:10 }}>
@@ -779,21 +795,169 @@ function ImportarCSV({ onClose }: { onClose: ()=>void }) {
   );
 }
 
+function TeamAutocomplete({ value, onChange, placeholder }: { value:string, onChange:(v:string)=>void, placeholder:string }) {
+  const [query, setQuery] = useState(value);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [equiposDB, setEquiposDB] = useState<string[]>([]);
+
+  useEffect(() => {
+    getDocs(collection(db, "equipos")).then(snap => {
+      setEquiposDB(snap.docs.map(d => d.data().nombre));
+    });
+  }, []);
+
+  const todosLosEquipos = [...new Set([...Object.keys(PAISES), ...equiposDB])].sort();
+
+  function handleInput(val: string) {
+    setQuery(val);
+    if (val.length < 2) { setSuggestions([]); return; }
+    const filtered = todosLosEquipos.filter(e =>
+      e.toLowerCase().includes(val.toLowerCase()) && e !== "Por definir"
+    ).slice(0, 6);
+    setSuggestions(filtered);
+  }
+
+  function select(nombre: string) {
+    setQuery(nombre);
+    onChange(nombre);
+    setSuggestions([]);
+  }
+
+  return (
+    <div style={{ position:"relative" }}>
+      <input
+        value={query}
+        onChange={e => handleInput(e.target.value)}
+        placeholder={placeholder}
+        style={{ ...inputStyle(), paddingLeft:10 }}
+      />
+      {suggestions.length > 0 && (
+        <div style={{ position:"absolute", top:"100%", left:0, right:0, zIndex:20,
+          background:"white", border:`1px solid ${BORDO_LIGHT}`, borderRadius:6,
+          boxShadow:"0 4px 12px rgba(0,0,0,0.15)", overflow:"hidden" }}>
+          {suggestions.map(s => (
+            <div key={s} onClick={() => select(s)}
+              style={{ display:"flex", alignItems:"center", gap:8, padding:"9px 12px",
+                borderBottom:"0.5px solid #eee", cursor:"pointer" }}>
+              <FlagImg pais={s} size={18} />
+              <span style={{ fontSize:13, color:BORDO }}>{s}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GestionEquipos({ onBack }: { onBack:()=>void }) {
+  const [equipos, setEquipos] = useState<any[]>([]);
+  const [nombre, setNombre] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [msg, setMsg] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    return onSnapshot(collection(db, "equipos"), snap => {
+      setEquipos(snap.docs.map(d => ({ id:d.id, ...d.data() })));
+    });
+  }, []);
+
+  async function agregar() {
+    if (!nombre.trim()) return;
+    setLoading(true);
+    await addDoc(collection(db, "equipos"), {
+      nombre: nombre.trim(),
+      imageUrl: imageUrl.trim() || "",
+      createdAt: serverTimestamp()
+    });
+    setNombre(""); setImageUrl("");
+    setMsg("✓ Equipo agregado");
+    setLoading(false);
+    setTimeout(() => setMsg(""), 3000);
+  }
+
+  async function eliminar(id: string) {
+    await deleteDoc(doc(db, "equipos", id));
+  }
+
+  return (
+    <div style={{ padding:12, background:MARFIL_LIGHT, flex:1 }}>
+      <button onClick={onBack} style={{ background:"none", border:"none", color:BORDO,
+        fontSize:12, marginBottom:12, display:"flex", alignItems:"center", gap:4 }}>
+        ← Volver al panel
+      </button>
+      <div style={{ fontSize:12, fontWeight:600, color:BORDO, marginBottom:10 }}>⚽ Gestión de equipos</div>
+      <div style={{ fontSize:10, color:"#888", marginBottom:12 }}>
+        Agregá equipos para usar en futuros prodes (Champions, ligas, etc.)
+        Los países del Mundial ya están disponibles automáticamente.
+      </div>
+
+      {msg && <div style={{ background:VERDE, color:"white", borderRadius:6,
+        padding:"8px 12px", fontSize:12, marginBottom:10 }}>{msg}</div>}
+
+      <div style={{ background:"white", borderRadius:12, border:"0.5px solid #e0ddd5", padding:14, marginBottom:10 }}>
+        <div style={{ fontSize:12, fontWeight:600, color:BORDO, marginBottom:10 }}>➕ Nuevo equipo</div>
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          <div>
+            <div style={{ fontSize:10, color:"#888", marginBottom:3 }}>Nombre del equipo</div>
+            <input value={nombre} onChange={e=>setNombre(e.target.value)}
+              placeholder="Ej: Real Madrid" style={inputStyle()} />
+          </div>
+          <div>
+            <div style={{ fontSize:10, color:"#888", marginBottom:3 }}>URL del escudo (opcional)</div>
+            <input value={imageUrl} onChange={e=>setImageUrl(e.target.value)}
+              placeholder="https://i.imgur.com/..." style={inputStyle()} />
+          </div>
+          {imageUrl && (
+            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+              <img src={imageUrl} alt="preview" style={{ width:32, height:32, objectFit:"contain", borderRadius:4 }}
+                onError={e => { (e.target as HTMLImageElement).style.display="none"; }} />
+              <span style={{ fontSize:11, color:"#888" }}>Preview del escudo</span>
+            </div>
+          )}
+          <button onClick={agregar} disabled={!nombre.trim()||loading}
+            style={{ background:BORDO, color:MARFIL, border:"none", borderRadius:6,
+              padding:10, fontSize:13, fontWeight:600, opacity:!nombre.trim()?0.4:1 }}>
+            {loading?"Guardando...":"Agregar equipo"}
+          </button>
+        </div>
+      </div>
+
+      {equipos.length > 0 && (
+        <div style={{ background:"white", borderRadius:12, border:"0.5px solid #e0ddd5", overflow:"hidden" }}>
+          <div style={{ background:BORDO_DARK, padding:"8px 12px" }}>
+            <span style={{ color:MARFIL, fontSize:12, fontWeight:600 }}>Equipos cargados ({equipos.length})</span>
+          </div>
+          {equipos.map((e, i) => (
+            <div key={e.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 14px",
+              borderBottom: i<equipos.length-1?"0.5px solid #eee":"none" }}>
+              {e.imageUrl
+                ? <img src={e.imageUrl} alt={e.nombre} style={{ width:26, height:26, objectFit:"contain", borderRadius:3 }} />
+                : <div style={{ width:26, height:26, background:MARFIL, borderRadius:3,
+                    display:"flex", alignItems:"center", justifyContent:"center",
+                    fontSize:10, color:BORDO, fontWeight:600 }}>{e.nombre.slice(0,2).toUpperCase()}</div>
+              }
+              <span style={{ flex:1, fontSize:13 }}>{e.nombre}</span>
+              <button onClick={() => eliminar(e.id)}
+                style={{ background:"none", border:`1px solid ${ROJO}`, borderRadius:4,
+                  padding:"3px 8px", fontSize:11, color:ROJO, cursor:"pointer" }}>🗑️</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 function FormPartido({ onSave, onCancel, initial }: { onSave:(d:any)=>void, onCancel:()=>void, initial?:any }) {
   const [form, setForm] = useState({
     fecha:initial?.fecha||"", hora:initial?.hora||"",
     fase:initial?.fase||"Grupos", grupo:initial?.grupo||"",
-    localN:initial?.localN||"Por definir", visitaN:initial?.visitaN||"Por definir",
+    localN:initial?.localN||"", visitaN:initial?.visitaN||"",
   });
   const set = (k:string,v:string) => setForm(f=>({...f,[k]:v}));
   const fases = ["Grupos","Round of 32","Octavos","Cuartos","Semifinal","Tercer puesto","Final"];
-  const paises = ["Por definir","Arabia Saudita","Argelia","Argentina","Australia","Austria",
-    "Bélgica","Bosnia y Herzegovina","Brasil","Cabo Verde","Canadá","Colombia","Corea del Sur",
-    "Costa de Marfil","Croacia","Curazao","Ecuador","Egipto","Escocia","España","EEUU",
-    "Francia","Ghana","Haití","Holanda","Inglaterra","Irak","Irán","Japón","Jordania",
-    "Marruecos","México","Nueva Zelanda","Noruega","Panamá","Paraguay","Portugal",
-    "Qatar","RD Congo","Rep. Checa","Senegal","Sudáfrica","Suecia","Suiza","Túnez",
-    "Turquía","Uruguay","Uzbekistán"].sort();
   return (
     <div style={{ background:"white", borderRadius:12, border:"0.5px solid #e0ddd5", padding:14, marginBottom:10 }}>
       <div style={{ fontSize:12, fontWeight:600, color:BORDO, marginBottom:10 }}>
@@ -813,12 +977,10 @@ function FormPartido({ onSave, onCancel, initial }: { onSave:(d:any)=>void, onCa
           <div><div style={{ fontSize:10, color:"#888", marginBottom:3 }}>Grupo</div>
             <input placeholder="A" value={form.grupo} onChange={e=>set("grupo",e.target.value)} style={inputStyle()} /></div>
         </div>
-        <div><div style={{ fontSize:10, color:"#888", marginBottom:3 }}>País local</div>
-          <select value={form.localN} onChange={e=>set("localN",e.target.value)} style={{...inputStyle(),padding:"0 6px"}}>
-            {paises.map(p=><option key={p}>{p}</option>)}</select></div>
-        <div><div style={{ fontSize:10, color:"#888", marginBottom:3 }}>País visitante</div>
-          <select value={form.visitaN} onChange={e=>set("visitaN",e.target.value)} style={{...inputStyle(),padding:"0 6px"}}>
-            {paises.map(p=><option key={p}>{p}</option>)}</select></div>
+        <div><div style={{ fontSize:10, color:"#888", marginBottom:3 }}>País / Equipo local</div>
+          <TeamAutocomplete value={form.localN} onChange={v=>set("localN",v)} placeholder="Buscá un equipo..." /></div>
+        <div><div style={{ fontSize:10, color:"#888", marginBottom:3 }}>País / Equipo visitante</div>
+          <TeamAutocomplete value={form.visitaN} onChange={v=>set("visitaN",v)} placeholder="Buscá un equipo..." /></div>
         <div style={{ display:"flex", gap:8, marginTop:4 }}>
           <button onClick={onCancel} style={{ flex:1, background:"none", border:`1px solid ${BORDO_LIGHT}`, borderRadius:6, padding:9, fontSize:12, color:BORDO }}>Cancelar</button>
           <button onClick={()=>onSave(form)} style={{ flex:2, background:BORDO, color:MARFIL, border:"none", borderRadius:6, padding:9, fontSize:12, fontWeight:600 }}>
@@ -895,7 +1057,7 @@ function GestionAdmins({ onBack }: { onBack: ()=>void }) {
   const admins = usuarios.filter(u => u.isAdmin);
 
   return (
-    <div style={{ padding:12, background:MARFIL_LIGHT, minHeight:"70vh" }}>
+    <div style={{ padding:12, background:MARFIL_LIGHT, flex:1 }}>
       <button onClick={onBack} style={{ background:"none", border:"none", color:BORDO,
         fontSize:12, marginBottom:12, display:"flex", alignItems:"center", gap:4 }}>
         ← Volver al panel
@@ -961,11 +1123,12 @@ function GestionAdmins({ onBack }: { onBack: ()=>void }) {
 
 function AdminPanel({ onBack }: { onBack:()=>void }) {
   const [partidos, setPartidos] = useState<any[]>([]);
-  const [vista, setVista] = useState<"menu"|"nuevo"|"resultado"|"lista"|"csv"|"admins">("menu");
+  const [vista, setVista] = useState<"menu"|"nuevo"|"resultado"|"lista"|"csv"|"admins"|"equipos">("menu");
   const [editando, setEditando] = useState<any>(null);
   const [confirmDelete, setConfirmDelete] = useState<string|null>(null);
   const [confirmBorrarTodo, setConfirmBorrarTodo] = useState(false);
   const [confirmCerrarJornada, setConfirmCerrarJornada] = useState(false);
+  const [confirmReinicio, setConfirmReinicio] = useState(false);
   const [lockHoras, setLockHoras] = useState("1");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
@@ -1001,6 +1164,47 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
     setLoading(false); setTimeout(()=>setMsg(""),3000);
   }
 
+  async function reiniciarPuntajes() {
+    setLoading(true);
+    const snap = await getDocs(collection(db, "usuarios"));
+    for (const d of snap.docs) {
+      await setDoc(d.ref, { pts:0, hoy:0, mov:0, rachaActual:0, rachaMasLarga:0, exactos:0, acierto:0, pos:0 }, { merge:true });
+    }
+    setConfirmReinicio(false);
+    setMsg("✓ Puntuación reiniciada para todos.");
+    setLoading(false);
+    setTimeout(() => setMsg(""), 4000);
+  }
+
+  async function exportarCSV() {
+    const [pronosSnap, partidosSnap, usuariosSnap] = await Promise.all([
+      getDocs(collection(db, "pronosticos")),
+      getDocs(collection(db, "partidos")),
+      getDocs(collection(db, "usuarios")),
+    ]);
+    const partidos: Record<string,any> = {};
+    partidosSnap.docs.forEach(d => { partidos[d.id] = d.data(); });
+    const usuarios: Record<string,string> = {};
+    usuariosSnap.docs.forEach(d => { usuarios[d.id] = d.data().nick || "Sin nick"; });
+
+    const rows = ["Nick,Partido,Local,Visitante,Resultado Real,Pronóstico,Puntos"];
+    pronosSnap.docs.forEach(d => {
+      const p = d.data();
+      const partido = partidos[p.matchId];
+      if (!partido) return;
+      const resultadoReal = partido.gL !== null && partido.gL !== undefined ? `${partido.gL}-${partido.gV}` : "Sin resultado";
+      rows.push(`"${usuarios[p.userId]||"?"}","${partido.localN} vs ${partido.visitaN}","${partido.localN}","${partido.visitaN}","${resultadoReal}","${p.mL}-${p.mV}","${p.pts ?? ""}"`);
+    });
+
+    const blob = new Blob(["\uFEFF" + rows.join("\n")], { type:"text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "ecfc_prode_resultados.csv";
+    a.click(); URL.revokeObjectURL(url);
+    setMsg("✓ CSV descargado");
+    setTimeout(() => setMsg(""), 3000);
+  }
+
   async function cerrarJornada() {
     setLoading(true);
     const snap = await getDocs(collection(db,"usuarios"));
@@ -1010,7 +1214,7 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
   }
 
   return (
-    <div style={{ padding:12, background:MARFIL_LIGHT, minHeight:"70vh" }}>
+    <div style={{ padding:12, background:MARFIL_LIGHT, flex:1 }}>
       <button onClick={onBack} style={{ background:"none", border:"none", color:BORDO, fontSize:12, marginBottom:12, display:"flex", alignItems:"center", gap:4 }}>← Volver al perfil</button>
       <div style={{ fontSize:12, fontWeight:600, color:BORDO, marginBottom:10 }}>🛡️ Panel de administrador</div>
 
@@ -1022,6 +1226,8 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
         <FormResultado partidos={partidos} onClose={()=>setVista("menu")} />
       ) : vista==="admins" ? (
         <GestionAdmins onBack={() => setVista("menu")} />
+      ) : vista==="equipos" ? (
+        <GestionEquipos onBack={() => setVista("menu")} />
       ) : vista==="csv" ? (
         <ImportarCSV onClose={()=>setVista("menu")} />
       ) : vista==="lista" ? (
@@ -1066,6 +1272,39 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
             </div>
           )}
 
+          {confirmReinicio && (
+            <div style={{ background:"white", borderRadius:12, border:`1.5px solid ${ROJO}`, padding:16, marginBottom:10 }}>
+              <div style={{ fontSize:13, fontWeight:600, color:ROJO, marginBottom:6 }}>⚠️ ¿Reiniciar todos los puntajes?</div>
+              <div style={{ fontSize:11, color:"#666", marginBottom:12 }}>Se pondrán en 0 los puntos, rachas y posiciones de todos. No se puede deshacer. Exportá el CSV antes si querés guardar los resultados.</div>
+              <div style={{ display:"flex", gap:8 }}>
+                <button onClick={() => setConfirmReinicio(false)} style={{ flex:1, background:"none", border:"1px solid #ccc", borderRadius:6, padding:9, fontSize:12 }}>Cancelar</button>
+                <button onClick={reiniciarPuntajes} disabled={loading} style={{ flex:1, background:ROJO, color:"white", border:"none", borderRadius:6, padding:9, fontSize:12, fontWeight:600 }}>
+                  {loading?"Reiniciando...":"Sí, reiniciar"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div style={{ background:"white", borderRadius:12, border:"0.5px solid #e0ddd5", overflow:"hidden", marginBottom:10 }}>
+            <div style={{ background:BORDO_DARK, padding:"8px 12px" }}><span style={{ color:MARFIL, fontSize:12, fontWeight:600 }}>📊 Datos</span></div>
+            <div onClick={exportarCSV} style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderBottom:"0.5px solid #eee", cursor:"pointer" }}>
+              <span style={{ fontSize:16 }}>⬇️</span>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:12, fontWeight:500, color:"#111" }}>Exportar resultados CSV</div>
+                <div style={{ fontSize:10, color:"#888" }}>Descarga pronósticos y puntajes</div>
+              </div>
+              <span style={{ color:"#ccc", fontSize:16 }}>›</span>
+            </div>
+            <div onClick={() => setConfirmReinicio(true)} style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px", cursor:"pointer" }}>
+              <span style={{ fontSize:16 }}>🔄</span>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:12, fontWeight:500, color:ROJO }}>Reiniciar puntuación</div>
+                <div style={{ fontSize:10, color:"#888" }}>Pone todos los puntajes en 0</div>
+              </div>
+              <span style={{ color:"#ccc", fontSize:16 }}>›</span>
+            </div>
+          </div>
+
           <div style={{ background:"white", borderRadius:12, border:"0.5px solid #e0ddd5", overflow:"hidden", marginBottom:10 }}>
             <div style={{ background:BORDO_DARK, padding:"8px 12px" }}><span style={{ color:MARFIL, fontSize:12, fontWeight:600 }}>🔒 Pronósticos</span></div>
             <div style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px" }}>
@@ -1106,8 +1345,16 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
             <div style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderBottom:"0.5px solid #eee", cursor:"pointer" }} onClick={() => setVista("admins")}>
               <span style={{ fontSize:16 }}>🛡️</span>
               <div style={{ flex:1 }}>
-                <div style={{ fontSize:12, fontWeight:500 }}>Asignar administradores</div>
+                <div style={{ fontSize:12, fontWeight:500, color:"#111" }}>Asignar administradores</div>
                 <div style={{ fontSize:10, color:"#888" }}>Hasta 5 admins en total</div>
+              </div>
+              <span style={{ color:"#ccc", fontSize:16 }}>›</span>
+            </div>
+            <div style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderBottom:"0.5px solid #eee", cursor:"pointer" }} onClick={() => setVista("equipos")}>
+              <span style={{ fontSize:16 }}>🏟️</span>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:12, fontWeight:500, color:"#111" }}>Gestión de equipos</div>
+                <div style={{ fontSize:10, color:"#888" }}>Para futuros prodes (Champions, ligas...)</div>
               </div>
               <span style={{ color:"#ccc", fontSize:16 }}>›</span>
             </div>
@@ -1117,7 +1364,7 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
                   <div style={{ fontSize:12, color:BORDO, fontWeight:500, marginBottom:6 }}>¿Cerrar jornada y resetear +Hoy para todos?</div>
                   <div style={{ fontSize:10, color:"#888", marginBottom:10 }}>Los puntos totales no cambian.</div>
                   <div style={{ display:"flex", gap:8 }}>
-                    <button onClick={()=>setConfirmCerrarJornada(false)} style={{ flex:1, background:"none", border:"1px solid #ccc", borderRadius:6, padding:8, fontSize:12 }}>Cancelar</button>
+                    <button onClick={()=>setConfirmCerrarJornada(false)} style={{ flex:1, background:"none", border:"1px solid #ccc", borderRadius:6, padding:8, fontSize:12, color:"#111" }}>Cancelar</button>
                     <button onClick={cerrarJornada} disabled={loading} style={{ flex:1, background:BORDO, color:MARFIL, border:"none", borderRadius:6, padding:8, fontSize:12, fontWeight:600 }}>
                       {loading?"Cerrando...":"Cerrar jornada"}</button>
                   </div>
@@ -1126,7 +1373,7 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
                 <div style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }} onClick={()=>setConfirmCerrarJornada(true)}>
                   <span style={{ fontSize:16 }}>🏁</span>
                   <div style={{ flex:1 }}>
-                    <div style={{ fontSize:12, fontWeight:500 }}>Cerrar jornada</div>
+                    <div style={{ fontSize:12, fontWeight:500, color:"#111" }}>Cerrar jornada</div>
                     <div style={{ fontSize:10, color:"#888" }}>Resetea el +Hoy de todos</div>
                   </div>
                   <span style={{ color:"#ccc", fontSize:16 }}>›</span>
@@ -1165,7 +1412,7 @@ function TabPerfil({ user, onLogout, isAdmin }: { user:any, onLogout:()=>void, i
   if (showAdmin) return <AdminPanel onBack={()=>setShowAdmin(false)} />;
 
   return (
-    <div style={{ padding:12, background:MARFIL_LIGHT, minHeight:"70vh" }}>
+    <div style={{ padding:12, background:MARFIL_LIGHT, flex:1 }}>
       <div style={{ background:"white", borderRadius:12, border:"0.5px solid #e0ddd5",
         padding:"20px 16px", marginBottom:10, display:"flex", flexDirection:"column",
         alignItems:"center", gap:10 }}>
@@ -1289,7 +1536,8 @@ export default function App() {
   return (
     <>
       <style>{css}</style>
-      <div style={{ width:390, maxWidth:"100%", background:"white", minHeight:"100vh", display:"flex", flexDirection:"column", borderRadius:28, overflow:"hidden", boxShadow:"0 8px 40px rgba(0,0,0,0.5)", margin:"20px auto" }}>
+      <div style={{ width:"100%", maxWidth:600, background:"white", height:"100vh",
+        display:"flex", flexDirection:"column" }}>
         <div style={{ background:BORDO, padding:"10px 20px 6px",
           display:"flex", justifyContent:"space-between", flexShrink:0 }}>
           <span style={{ color:MARFIL, fontSize:11, fontWeight:500 }}>{horaArt}</span>
@@ -1316,7 +1564,7 @@ export default function App() {
           </div>
         </div>
 
-        <div style={{ flex:1, overflowY:"auto" }}>
+        <div style={{ flex:1, overflowY:"auto", display:"flex", flexDirection:"column" }}>
           {authLoading
             ? <div style={{ padding:40, textAlign:"center", color:"#aaa", background:MARFIL_LIGHT }}>Cargando...</div>
             : !user
