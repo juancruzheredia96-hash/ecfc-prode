@@ -594,6 +594,7 @@ function PlayerAutocomplete({ value, onChange, categoria }: { value:string, onCh
 
   function handleInput(val: string) {
     setQuery(val);
+    onChange(val);
     if (val.length < 2) { setSuggestions([]); return; }
     setSuggestions(todos.filter(j => j.toLowerCase().includes(val.toLowerCase())).slice(0, 6));
   }
@@ -607,9 +608,19 @@ function PlayerAutocomplete({ value, onChange, categoria }: { value:string, onCh
     }
   }
 
+  async function handleBlur() {
+    setSuggestions([]);
+    const nombre = query.trim();
+    if (nombre.length < 2) return;
+    if (!base.includes(nombre) && !jugadoresDB.includes(nombre)) {
+      await addDoc(collection(db, "jugadores_predicciones"), { nombre, categoria, createdAt: serverTimestamp() });
+    }
+  }
+
   return (
     <div style={{ position:"relative" }}>
       <input value={query} onChange={e => handleInput(e.target.value)}
+        onBlur={handleBlur}
         placeholder="Escribí un nombre..."
         disabled={prediccionesBloqueadas()}
         style={{ ...inputStyle(), opacity: prediccionesBloqueadas() ? 0.6 : 1 }} />
