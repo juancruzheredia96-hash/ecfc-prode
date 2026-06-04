@@ -23,12 +23,12 @@ const db = getFirestore(firebaseApp);
 const auth = getAuth(firebaseApp);
 const provider = new GoogleAuthProvider();
 
-const MARFIL = "#dbd6c0";
-const BORDO = "#4e1a1b";
-const BORDO_LIGHT = "#7a2e2f";
-const BORDO_DARK = "#2e0f10";
-const MARFIL_DARK = "#b8b09a";
-const MARFIL_LIGHT = "#f0ece0";
+const MARFIL = "#e8e8e8";
+const BORDO = "#2c3e50";
+const BORDO_LIGHT = "#4a6278";
+const BORDO_DARK = "#1a2530";
+const MARFIL_DARK = "#a0a8b0";
+const MARFIL_LIGHT = "#f2f4f6";
 const VERDE = "#2e7d32";
 const AMARILLO = "#e65100";
 const ROJO = "#c62828";
@@ -92,7 +92,7 @@ const JUGADORES_BASE: Record<string, string[]> = {
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Barlow', sans-serif; background: #f0ece0; min-height: 100vh; display: flex; justify-content: center; margin: 0; }
+  body { font-family: 'Barlow', sans-serif; background: #f2f4f6; min-height: 100vh; display: flex; justify-content: center; margin: 0; }
   input[type=number]::-webkit-inner-spin-button,
   input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   input[type=number] { -moz-appearance: textfield; }
@@ -247,10 +247,10 @@ function LoginScreen() {
     <div style={{ display:"flex", flexDirection:"column", alignItems:"center",
       justifyContent:"center", minHeight:"80vh", padding:32,
       background:MARFIL_LIGHT, gap:24 }}>
-      <img src="https://i.imgur.com/0e3BR0T.png" alt="ECFC" style={{ width:90, height:90, objectFit:"contain" }} />
+      <div style={{ fontSize:56 }}>⚽</div>
       <div style={{ textAlign:"center" }}>
-        <div style={{ fontSize:22, fontWeight:700, color:BORDO }}>Elefante y Castillo FC</div>
-        <div style={{ fontSize:14, color:BORDO_LIGHT, marginTop:4 }}>Prode Mundial 2026</div>
+        <div style={{ fontSize:22, fontWeight:700, color:BORDO }}>Prode Mundial 2026</div>
+        
       </div>
       <button onClick={handleLogin} disabled={loading} style={{
         background:BORDO, color:MARFIL, border:"none", borderRadius:8,
@@ -1695,7 +1695,7 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
     const blob = new Blob(["\uFEFF" + rows.join("\n")], { type:"text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = "ecfc_prode_resultados.csv";
+    a.href = url; a.download = "prode_resultados.csv";
     a.click(); URL.revokeObjectURL(url);
     setMsg("✓ CSV descargado");
     setTimeout(() => setMsg(""), 3000);
@@ -2060,11 +2060,10 @@ export default function App() {
         </div>
         <div style={{ background:BORDO, padding:"10px 16px 12px",
           display:"flex", alignItems:"center", gap:10 }}>
-          <img src="https://i.imgur.com/0e3BR0T.png" alt="ECFC"
-            style={{ width:48, height:48, objectFit:"contain" }} />
+          
           <div style={{ display:"flex", flexDirection:"column", justifyContent:"center", gap:3 }}>
-            <div style={{ color:MARFIL, fontSize:15, fontWeight:600 }}>Elefante y Castillo FC</div>
-            <div style={{ color:MARFIL_DARK, fontSize:11 }}>Prode Mundial 2026</div>
+            <div style={{ color:MARFIL, fontSize:15, fontWeight:600 }}>Prode Mundial 2026</div>
+            
           </div>
           <div onClick={()=>setActiveTab("perfil")} style={{ marginLeft:"auto", width:32, height:32,
             background:BORDO_LIGHT, border:`2px solid ${MARFIL}`, borderRadius:"50%",
