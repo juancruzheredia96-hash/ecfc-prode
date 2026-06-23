@@ -1799,6 +1799,57 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
     setGuardandoLock(false);
   }
 
+  const [diagnosticando, setDiagnosticando] = useState(false);
+  const [diagnosticoResultado, setDiagnosticoResultado] = useState<any[]|null>(null);
+
+  async function diagnosticarPuntos() {
+    setDiagnosticando(true);
+    setDiagnosticoResultado(null);
+    try {
+      const partidosSnap = await getDocs(query(collection(db, "partidos"), orderBy("fecha"), orderBy("hora")));
+      const partidosOrden: string[] = [];
+      partidosSnap.docs.forEach(d => {
+        const p = d.data();
+        if (p.gL !== null && p.gL !== undefined && p.gV !== null && p.gV !== undefined) partidosOrden.push(d.id);
+      });
+
+      const pronosSnap = await getDocs(query(collection(db, "pronosticos"), where("calculado","==",true)));
+      const porUsuario: Record<string, Record<string, number>> = {};
+      pronosSnap.docs.forEach(d => {
+        const { userId, matchId, pts } = d.data();
+        if (!porUsuario[userId]) porUsuario[userId] = {};
+        porUsuario[userId][matchId] = pts || 0;
+      });
+
+      const usuariosSnap = await getDocs(collection(db, "usuarios"));
+      const reporte: any[] = [];
+
+      usuariosSnap.docs.forEach(d => {
+        const ud = d.data();
+        const misPronos = porUsuario[d.id] || {};
+        const sumaReal = Object.values(misPronos).reduce((acc, v) => acc + v, 0);
+        const ptsGuardado = ud.pts || 0;
+        const diferencia = sumaReal - ptsGuardado;
+
+        if (diferencia !== 0) {
+          const partidosConPuntos = partidosOrden
+            .filter(mid => (misPronos[mid] || 0) > 0)
+            .map(mid => ({ matchId: mid, pts: misPronos[mid] }));
+
+          reporte.push({
+            userId: d.id, nick: ud.nick || "Sin nick",
+            ptsGuardado, sumaReal, diferencia, partidosConPuntos,
+          });
+        }
+      });
+
+      setDiagnosticoResultado(reporte);
+    } catch (e) {
+      setDiagnosticoResultado([{ error: "Error al diagnosticar, probá de nuevo" }]);
+    }
+    setDiagnosticando(false);
+  }
+
   const [recalculando, setRecalculando] = useState(false);
   const [recalculoMsg, setRecalculoMsg] = useState("");
 
@@ -2064,6 +2115,53 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
             </div>
             {lockHoras === lockHorasGuardado && (
               <div style={{ padding:"0 14px 10px", fontSize:10, color:VERDE }}>✓ Guardado, aplica a todos los partidos</div>
+            )}
+          </div>
+
+          <div style={{ background:"white", borderRadius:12, border:"0.5px solid #e0ddd5", overflow:"hidden", marginBottom:10 }}>
+            <div style={{ background:BORDO_DARK, padding:"8px 12px" }}><span style={{ color:MARFIL, fontSize:12, fontWeight:600 }}>🔍 Diagnóstico (solo lectura)</span></div>
+            <div style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px" }}>
+              <span style={{ fontSize:16 }}>🩺</span>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:12, fontWeight:500 }}>Detectar puntos desincronizados</div>
+                <div style={{ fontSize:10, color:"#888" }}>Compara la suma real de pronósticos vs el total guardado</div>
+              </div>
+              <button onClick={diagnosticarPuntos} disabled={diagnosticando}
+                style={{ background:BORDO, color:MARFIL, border:"none", borderRadius:5,
+                  padding:"6px 10px", fontSize:11, fontWeight:600, cursor:"pointer",
+                  opacity:diagnosticando?0.6:1, whiteSpace:"nowrap" }}>
+                {diagnosticando ? "Revisando..." : "Diagnosticar"}
+              </button>
+            </div>
+            {diagnosticoResultado && diagnosticoResultado.length === 0 && (
+              <div style={{ padding:"0 14px 12px", fontSize:11, color:VERDE }}>✓ Todo coincide, no se encontraron desincronizaciones</div>
+            )}
+            {diagnosticoResultado && diagnosticoResultado.length > 0 && (
+              <div style={{ padding:"0 14px 12px" }}>
+                {diagnosticoResultado.map((r:any, i:number) => (
+                  <div key={i} style={{ background:MARFIL_LIGHT, borderRadius:8, padding:10, marginBottom:8,
+                    border:"0.5px solid #e0ddd5" }}>
+                    {r.error
+                      ? <div style={{ fontSize:11, color:ROJO }}>{r.error}</div>
+                      : (
+                        <>
+                          <div style={{ fontSize:12, fontWeight:600, color:BORDO }}>{r.nick}</div>
+                          <div style={{ fontSize:11, color:"#555", marginTop:2 }}>
+                            Guardado: <b>{r.ptsGuardado}</b> · Suma real de pronósticos: <b>{r.sumaReal}</b> ·
+                            Diferencia: <b style={{ color:ROJO }}>{r.diferencia > 0 ? "+" : ""}{r.diferencia}</b>
+                          </div>
+                          <div style={{ fontSize:10, color:"#888", marginTop:4 }}>
+                            Partidos con puntos pronosticados ({r.partidosConPuntos.length}):
+                          </div>
+                          <div style={{ fontSize:9, color:"#aaa", marginTop:2, wordBreak:"break-all" }}>
+                            {r.partidosConPuntos.map((p:any) => `${p.matchId.slice(0,8)}…(${p.pts}pt)`).join(", ")}
+                          </div>
+                        </>
+                      )
+                    }
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 
