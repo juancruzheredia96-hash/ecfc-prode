@@ -578,6 +578,7 @@ function TabTabla({ onSelectUser }: { onSelectUser: (uid: string) => void }) {
   const [jugadores, setJugadores] = useState<any[]>([]);
   const [desglose, setDesglose] = useState<Record<string, { x3:number, x2:number, x1:number, x0:number }>>({});
   const [viewportWidth, setViewportWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 600);
+  const [fechaCorte, setFechaCorte] = useState<string|null>(null);
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2,"0");
   const fecha = `${pad(now.getDate())}/${pad(now.getMonth()+1)}/${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
@@ -594,13 +595,30 @@ function TabTabla({ onSelectUser }: { onSelectUser: (uid: string) => void }) {
     return onSnapshot(q, snap => setJugadores(snap.docs.map(d => ({ id:d.id, ...d.data() }))));
   }, []);
 
+  // El primer partido real del torneo (Mexico vs Sudafrica) marca el corte: cualquier
+  // pronostico de un partido con fecha anterior a esta es de pruebas iniciales y se descarta.
+  useEffect(() => {
+    getDoc(doc(db, "partidos", "mgpUr5zbxrVJZHGBEN97")).then(snap => {
+      if (snap.exists() && snap.data().fecha) setFechaCorte(snap.data().fecha);
+    });
+  }, []);
+
   useEffect(() => {
     const q = query(collection(db, "pronosticos"), where("calculado", "==", true));
-    return onSnapshot(q, snap => {
+    return onSnapshot(q, async snap => {
+      // Necesitamos la fecha de cada partido para filtrar; armamos un mapa matchId->fecha una sola vez
+      const matchIds = Array.from(new Set(snap.docs.map(d => d.data().matchId).filter(Boolean)));
+      const fechaPorMatch: Record<string,string> = {};
+      await Promise.all(matchIds.map(async (mid:string) => {
+        const pSnap = await getDoc(doc(db,"partidos",mid));
+        if (pSnap.exists()) fechaPorMatch[mid] = pSnap.data().fecha || "";
+      }));
+
       const acc: Record<string, { x3:number, x2:number, x1:number, x0:number }> = {};
       snap.docs.forEach(d => {
-        const { userId, pts } = d.data();
+        const { userId, pts, matchId } = d.data();
         if (!userId || (pts !== 3 && pts !== 2 && pts !== 1 && pts !== 0)) return;
+        if (fechaCorte && matchId && fechaPorMatch[matchId] && fechaPorMatch[matchId] < fechaCorte) return; // descarta pruebas iniciales
         if (!acc[userId]) acc[userId] = { x3:0, x2:0, x1:0, x0:0 };
         if (pts === 3) acc[userId].x3++;
         else if (pts === 2) acc[userId].x2++;
@@ -609,7 +627,7 @@ function TabTabla({ onSelectUser }: { onSelectUser: (uid: string) => void }) {
       });
       setDesglose(acc);
     });
-  }, []);
+  }, [fechaCorte]);
 
   const COL_NUM = 38;
   const PADDING = 12;
@@ -672,9 +690,9 @@ function TabTabla({ onSelectUser }: { onSelectUser: (uid: string) => void }) {
             <div style={{ overflowX:"auto", width:scrollAreaWidth, touchAction:"pan-x", WebkitOverflowScrolling:"touch" }}>
               <div style={{ display:"flex", gap:6, padding:"4px 12px", background:BORDO_DARK, height:24,
                 boxSizing:"border-box", alignItems:"center", width:"max-content" }}>
-                {["Pts","x3","x2","x1","x0","+Hoy","▲▼"].map((h,i) => (
+                {["Pts","x3","x2","x1","+Hoy","▲▼"].map((h,i) => (
                   <span key={i} style={{ fontSize:9, color:MARFIL_DARK, fontWeight:500,
-                    minWidth:i===0?36:i===5?32:i===6?28:COL_NUM, textAlign:"right" }}>{h}</span>
+                    minWidth:i===0?36:i===4?32:i===5?28:COL_NUM, textAlign:"right" }}>{h}</span>
                 ))}
               </div>
               {jugadores.map(j => {
@@ -693,7 +711,6 @@ function TabTabla({ onSelectUser }: { onSelectUser: (uid: string) => void }) {
                     <span style={{ fontSize:13, fontWeight:500, color:BORDO, minWidth:COL_NUM, textAlign:"right" }}>{d.x3}</span>
                     <span style={{ fontSize:13, fontWeight:500, color:"#555", minWidth:COL_NUM, textAlign:"right" }}>{d.x2}</span>
                     <span style={{ fontSize:13, fontWeight:500, color:"#999", minWidth:COL_NUM, textAlign:"right" }}>{d.x1}</span>
-                    <span style={{ fontSize:13, fontWeight:500, color:"#ccc", minWidth:COL_NUM, textAlign:"right" }}>{d.x0}</span>
                     <span style={{ fontSize:11, color:VERDE, minWidth:32, textAlign:"right" }}>+{j.hoy||0}</span>
                     <span style={{ fontSize:10, fontWeight:500, minWidth:28, textAlign:"right" }}>{movEl}</span>
                   </div>
@@ -1960,6 +1977,32 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
     setDiagnosticando(false);
   }
 
+  const [reparando, setReparando] = useState(false);
+  const [reparandoMsg, setReparandoMsg] = useState("");
+
+  async function repararPartidosDetectados() {
+    if (partidosAfectadosResumen.length === 0) return;
+    setReparando(true);
+    setReparandoMsg("");
+    try {
+      // Volvemos a leer el resultado real de cada partido detectado, y re-ejecutamos
+      // calcularPuntosPartido sobre el — es seguro: la funcion sobreescribe sin duplicar.
+      for (const p of partidosAfectadosResumen) {
+        const partidoSnap = await getDoc(doc(db, "partidos", p.matchId));
+        if (!partidoSnap.exists()) continue;
+        const pd = partidoSnap.data();
+        if (pd.gL === null || pd.gL === undefined || pd.gV === null || pd.gV === undefined) continue;
+        await calcularPuntosPartido(p.matchId, pd.gL, pd.gV);
+      }
+      setReparandoMsg(`✓ ${partidosAfectadosResumen.length} partido(s) reprocesado(s). Volvé a diagnosticar para confirmar.`);
+      setPartidosAfectadosResumen([]);
+      setDiagnosticoResultado(null);
+    } catch (e) {
+      setReparandoMsg("✗ Error al reparar, probá de nuevo");
+    }
+    setReparando(false);
+  }
+
   const [recalculando, setRecalculando] = useState(false);
   const [recalculoMsg, setRecalculoMsg] = useState("");
 
@@ -2258,8 +2301,16 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
             </div>
             {partidosAfectadosResumen.length > 0 && (
               <div style={{ padding:"0 14px 10px" }}>
-                <div style={{ fontSize:11, fontWeight:600, color:BORDO, marginBottom:6 }}>
-                  📋 Resumen: {partidosAfectadosResumen.length} partido{partidosAfectadosResumen.length>1?"s":""} con problemas
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 }}>
+                  <div style={{ fontSize:11, fontWeight:600, color:BORDO }}>
+                    📋 Resumen: {partidosAfectadosResumen.length} partido{partidosAfectadosResumen.length>1?"s":""} con problemas
+                  </div>
+                  <button onClick={repararPartidosDetectados} disabled={reparando}
+                    style={{ background:VERDE, color:MARFIL, border:"none", borderRadius:5,
+                      padding:"5px 9px", fontSize:10, fontWeight:600, cursor:"pointer",
+                      opacity:reparando?0.6:1, whiteSpace:"nowrap" }}>
+                    {reparando ? "Reparando..." : "🔧 Reparar"}
+                  </button>
                 </div>
                 {partidosAfectadosResumen.map((p:any, i:number) => (
                   <div key={i} style={{ fontSize:10, color:"#555", marginBottom:4, padding:6,
@@ -2267,6 +2318,9 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
                     <b>{p.matchId}</b> → afecta a {p.afectados} jugador{p.afectados>1?"es":""}: {p.nombres.join(", ")}
                   </div>
                 ))}
+                {reparandoMsg && (
+                  <div style={{ fontSize:10, color:reparandoMsg.startsWith("✓")?VERDE:ROJO, marginTop:4 }}>{reparandoMsg}</div>
+                )}
               </div>
             )}
             {diagnosticoResultado && diagnosticoResultado.length === 0 && (
