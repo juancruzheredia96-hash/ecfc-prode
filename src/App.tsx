@@ -1985,16 +1985,14 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
     setReparando(true);
     setReparandoMsg("");
     try {
-      // Volvemos a leer el resultado real de cada partido detectado, y re-ejecutamos
-      // calcularPuntosPartido sobre el — es seguro: la funcion sobreescribe sin duplicar.
-      for (const p of partidosAfectadosResumen) {
-        const partidoSnap = await getDoc(doc(db, "partidos", p.matchId));
-        if (!partidoSnap.exists()) continue;
-        const pd = partidoSnap.data();
-        if (pd.gL === null || pd.gL === undefined || pd.gV === null || pd.gV === undefined) continue;
-        await calcularPuntosPartido(p.matchId, pd.gL, pd.gV);
-      }
-      setReparandoMsg(`✓ ${partidosAfectadosResumen.length} partido(s) reprocesado(s). Volvé a diagnosticar para confirmar.`);
+      // IMPORTANTE: NO usar calcularPuntosPartido aca (es aditiva, pensada para correr
+      // una sola vez por partido nuevo - si se vuelve a ejecutar sobre un partido ya
+      // procesado, duplica los puntos de TODOS los usuarios, no solo los afectados).
+      // En su lugar, recalculamos todo desde cero con recalcularAciertoHistorico,
+      // que es determinístico e idempotente: da el mismo resultado sin importar
+      // cuantas veces se ejecute.
+      await recalcularAciertoHistorico();
+      setReparandoMsg(`✓ Recalculado desde cero. Volvé a diagnosticar para confirmar.`);
       setPartidosAfectadosResumen([]);
       setDiagnosticoResultado(null);
     } catch (e) {
@@ -2010,11 +2008,16 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
     setRecalculando(true);
     setRecalculoMsg("");
     try {
+      // Fecha de corte: excluye partidos de prueba/simulacion anteriores al primer partido real
+      const primerPartidoSnap = await getDoc(doc(db, "partidos", "mgpUr5zbxrVJZHGBEN97"));
+      const fechaCorte = primerPartidoSnap.exists() ? (primerPartidoSnap.data().fecha || "") : "";
+
       const partidosSnap = await getDocs(query(collection(db, "partidos"), orderBy("fecha"), orderBy("hora")));
       const partidosOrdenados: { id:string, gL:number, gV:number }[] = [];
       partidosSnap.docs.forEach(d => {
         const p = d.data();
         if (p.gL !== null && p.gL !== undefined && p.gV !== null && p.gV !== undefined) {
+          if (fechaCorte && p.fecha && p.fecha < fechaCorte) return; // descarta partidos de simulacion previos
           partidosOrdenados.push({ id: d.id, gL: p.gL, gV: p.gV });
         }
       });
@@ -2033,23 +2036,24 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
       await Promise.all(usuariosSnap.docs.map(d => {
         const misPronos = pronosPorUsuario[d.id] || {};
         let golesAcertados = 0, golesPronosticados = 0, exactos = 0, aciertosResultado = 0;
-        let rachaActual = 0, rachaMasLarga = 0, ceroRacha = 0;
+        let rachaActual = 0, rachaMasLarga = 0, ceroRacha = 0, pts = 0;
 
-        // Recorre en orden cronologico para que las rachas (consecutivos) sean correctas
+        // Recorre en orden cronologico para que las rachas (consecutivos) y pts sean correctos
         partidosOrdenados.forEach(real => {
           const prono = misPronos[real.id];
           const tienePronostico = !!prono;
-          const pts = tienePronostico ? (calcPtsNuevo(real.gL, real.gV, prono.mL, prono.mV) ?? 0) : 0;
+          const ptsPartido = tienePronostico ? (calcPtsNuevo(real.gL, real.gV, prono.mL, prono.mV) ?? 0) : 0;
+          pts += ptsPartido;
 
           if (tienePronostico) {
             golesPronosticados += 2;
             if (prono.mL === real.gL) golesAcertados++;
             if (prono.mV === real.gV) golesAcertados++;
-            if (pts >= 1) aciertosResultado++;
+            if (ptsPartido >= 1) aciertosResultado++;
           }
-          if (pts === 3) { exactos++; rachaActual++; } else { rachaActual = 0; }
+          if (ptsPartido === 3) { exactos++; rachaActual++; } else { rachaActual = 0; }
           rachaMasLarga = Math.max(rachaMasLarga, rachaActual);
-          ceroRacha = pts === 0 ? ceroRacha + 1 : 0;
+          ceroRacha = ptsPartido === 0 ? ceroRacha + 1 : 0;
         });
 
         const acierto = golesPronosticados > 0 ? Math.round((golesAcertados/golesPronosticados)*100) : 0;
@@ -2057,7 +2061,7 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
         const pctAciertoResultado = totalPartidosConResultado > 0 ? Math.round((aciertosResultado/totalPartidosConResultado)*100) : 0;
 
         return setDoc(d.ref, {
-          golesAcertados, golesPronosticados, acierto,
+          pts, golesAcertados, golesPronosticados, acierto,
           partidosConResultado: totalPartidosConResultado,
           aciertosResultado, pctExactos, pctAciertoResultado,
           rachaActual, rachaMasLarga, ceroRacha,
@@ -2367,7 +2371,7 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
               <span style={{ fontSize:16 }}>📊</span>
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:12, fontWeight:500 }}>Estadísticas de acierto</div>
-                <div style={{ fontSize:10, color:"#888" }}>Recalcula % goles, % exactos y % acierto con todo lo jugado</div>
+                <div style={{ fontSize:10, color:"#888" }}>Recalcula puntos, % goles, % exactos y % acierto desde cero, excluyendo partidos de prueba</div>
               </div>
               <button onClick={recalcularAciertoHistorico} disabled={recalculando}
                 style={{ background:BORDO, color:MARFIL, border:"none", borderRadius:5,
