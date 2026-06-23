@@ -1813,14 +1813,15 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
         if (p.gL !== null && p.gL !== undefined && p.gV !== null && p.gV !== undefined) partidosOrden.push(d.id);
       });
 
-      // TODOS los pronosticos (no solo los calculados), para distinguir "nunca pronosticó"
-      // de "pronosticó pero quedó sin marcar calculado"
+      // TODOS los pronosticos (no solo los calculados), agrupando por userId+matchId
+      // para detectar si hay MAS DE UN documento para la misma combinacion (duplicados)
       const todosPronosSnap = await getDocs(collection(db, "pronosticos"));
-      const todosPorUsuario: Record<string, Record<string, { pts:number|null, calculado:boolean }>> = {};
+      const porUsuario: Record<string, Record<string, { pts:number|null, calculado:boolean, docId:string }[]>> = {};
       todosPronosSnap.docs.forEach(d => {
         const { userId, matchId, pts, calculado } = d.data();
-        if (!todosPorUsuario[userId]) todosPorUsuario[userId] = {};
-        todosPorUsuario[userId][matchId] = { pts: pts ?? null, calculado: !!calculado };
+        if (!porUsuario[userId]) porUsuario[userId] = {};
+        if (!porUsuario[userId][matchId]) porUsuario[userId][matchId] = [];
+        porUsuario[userId][matchId].push({ pts: pts ?? null, calculado: !!calculado, docId: d.id });
       });
 
       const usuariosSnap = await getDocs(collection(db, "usuarios"));
@@ -1828,30 +1829,33 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
 
       usuariosSnap.docs.forEach(d => {
         const ud = d.data();
-        const misPronos = todosPorUsuario[d.id] || {};
+        const misPronos = porUsuario[d.id] || {};
 
-        const sumaReal = Object.values(misPronos)
-          .filter(p => p.calculado)
-          .reduce((acc, p) => acc + (p.pts || 0), 0);
+        // Suma real: si hay duplicados para el mismo matchId, los suma TODOS (asi se nota el problema)
+        let sumaReal = 0;
+        const duplicados: any[] = [];
+        Object.entries(misPronos).forEach(([matchId, docs]) => {
+          if (docs.length > 1) {
+            duplicados.push({ matchId, docs });
+          }
+          docs.forEach(doc => { if (doc.calculado) sumaReal += (doc.pts || 0); });
+        });
+
         const ptsGuardado = ud.pts || 0;
         const diferencia = sumaReal - ptsGuardado;
 
         if (diferencia !== 0) {
-          // Partidos jugados donde NO hay ningun documento de pronostico (nunca cargo nada)
           const sinPronosticoAlguno = partidosOrden.filter(mid => !misPronos[mid]);
-          // Partidos jugados donde SI hay pronostico pero no quedo marcado calculado:true
-          // (este es el caso clave: se cargo el pronostico, pero el calculo de puntos no lo proceso)
           const conPronosticoSinCalcular = partidosOrden.filter(mid => {
-            const p = misPronos[mid];
-            return p && !p.calculado;
+            const docs = misPronos[mid];
+            return docs && docs.every(doc => !doc.calculado);
           });
 
           reporte.push({
             userId: d.id, nick: ud.nick || "Sin nick",
             ptsGuardado, sumaReal, diferencia,
             totalPartidosJugados: partidosOrden.length,
-            sinPronosticoAlguno,
-            conPronosticoSinCalcular,
+            sinPronosticoAlguno, conPronosticoSinCalcular, duplicados,
           });
         }
       });
@@ -2164,6 +2168,22 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
                             Diferencia: <b style={{ color:ROJO }}>{r.diferencia > 0 ? "+" : ""}{r.diferencia}</b>
                             {" "}· {r.totalPartidosJugados} partidos jugados en total
                           </div>
+
+                          {r.duplicados.length > 0 && (
+                            <div style={{ marginTop:6 }}>
+                              <div style={{ fontSize:10, fontWeight:600, color:ROJO }}>
+                                🚨 Pronóstico DUPLICADO para el mismo partido ({r.duplicados.length}):
+                              </div>
+                              {r.duplicados.map((dup:any, j:number) => (
+                                <div key={j} style={{ fontSize:9, color:"#555", marginTop:3, paddingLeft:6 }}>
+                                  matchId: {dup.matchId}<br/>
+                                  {dup.docs.map((doc:any, k:number) => (
+                                    <span key={k}>↳ docId: {doc.docId} · pts: {doc.pts} · calculado: {String(doc.calculado)}<br/></span>
+                                  ))}
+                                </div>
+                              ))}
+                            </div>
+                          )}
 
                           {r.conPronosticoSinCalcular.length > 0 && (
                             <div style={{ marginTop:6 }}>
