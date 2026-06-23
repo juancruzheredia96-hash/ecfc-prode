@@ -1801,6 +1801,7 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
 
   const [diagnosticando, setDiagnosticando] = useState(false);
   const [diagnosticoResultado, setDiagnosticoResultado] = useState<any[]|null>(null);
+  const [partidosAfectadosResumen, setPartidosAfectadosResumen] = useState<any[]>([]);
 
   async function diagnosticarPuntos() {
     setDiagnosticando(true);
@@ -1869,6 +1870,17 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
           });
         }
       });
+
+      // Resumen agrupado por matchId: cuantos usuarios distintos afecta cada partido problematico
+      const porPartido: Record<string, { afectados:number, nombres:string[] }> = {};
+      reporte.forEach(r => {
+        r.inconsistencias.forEach((inc:any) => {
+          if (!porPartido[inc.matchId]) porPartido[inc.matchId] = { afectados:0, nombres:[] };
+          porPartido[inc.matchId].afectados++;
+          porPartido[inc.matchId].nombres.push(r.nick);
+        });
+      });
+      setPartidosAfectadosResumen(Object.entries(porPartido).map(([matchId, info]) => ({ matchId, ...info })));
 
       setDiagnosticoResultado(reporte);
     } catch (e) {
@@ -2160,6 +2172,19 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
                 {diagnosticando ? "Revisando..." : "Diagnosticar"}
               </button>
             </div>
+            {partidosAfectadosResumen.length > 0 && (
+              <div style={{ padding:"0 14px 10px" }}>
+                <div style={{ fontSize:11, fontWeight:600, color:BORDO, marginBottom:6 }}>
+                  📋 Resumen: {partidosAfectadosResumen.length} partido{partidosAfectadosResumen.length>1?"s":""} con problemas
+                </div>
+                {partidosAfectadosResumen.map((p:any, i:number) => (
+                  <div key={i} style={{ fontSize:10, color:"#555", marginBottom:4, padding:6,
+                    background:"#fff", borderRadius:6, border:"0.5px solid #e0ddd5" }}>
+                    <b>{p.matchId}</b> → afecta a {p.afectados} jugador{p.afectados>1?"es":""}: {p.nombres.join(", ")}
+                  </div>
+                ))}
+              </div>
+            )}
             {diagnosticoResultado && diagnosticoResultado.length === 0 && (
               <div style={{ padding:"0 14px 12px", fontSize:11, color:VERDE }}>✓ Todo coincide, no se encontraron desincronizaciones</div>
             )}
