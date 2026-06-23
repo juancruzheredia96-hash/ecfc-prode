@@ -576,7 +576,7 @@ function TabPartidos({ userId, lockHoras }: { userId: string, lockHoras: number 
 
 function TabTabla({ onSelectUser }: { onSelectUser: (uid: string) => void }) {
   const [jugadores, setJugadores] = useState<any[]>([]);
-  const [desglose, setDesglose] = useState<Record<string, { x3:number, x2:number, x1:number }>>({});
+  const [desglose, setDesglose] = useState<Record<string, { x3:number, x2:number, x1:number, x0:number }>>({});
   const [viewportWidth, setViewportWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 600);
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2,"0");
@@ -597,14 +597,15 @@ function TabTabla({ onSelectUser }: { onSelectUser: (uid: string) => void }) {
   useEffect(() => {
     const q = query(collection(db, "pronosticos"), where("calculado", "==", true));
     return onSnapshot(q, snap => {
-      const acc: Record<string, { x3:number, x2:number, x1:number }> = {};
+      const acc: Record<string, { x3:number, x2:number, x1:number, x0:number }> = {};
       snap.docs.forEach(d => {
         const { userId, pts } = d.data();
-        if (!userId || (pts !== 3 && pts !== 2 && pts !== 1)) return;
-        if (!acc[userId]) acc[userId] = { x3:0, x2:0, x1:0 };
+        if (!userId || (pts !== 3 && pts !== 2 && pts !== 1 && pts !== 0)) return;
+        if (!acc[userId]) acc[userId] = { x3:0, x2:0, x1:0, x0:0 };
         if (pts === 3) acc[userId].x3++;
         else if (pts === 2) acc[userId].x2++;
-        else acc[userId].x1++;
+        else if (pts === 1) acc[userId].x1++;
+        else acc[userId].x0++;
       });
       setDesglose(acc);
     });
@@ -671,13 +672,13 @@ function TabTabla({ onSelectUser }: { onSelectUser: (uid: string) => void }) {
             <div style={{ overflowX:"auto", width:scrollAreaWidth, touchAction:"pan-x", WebkitOverflowScrolling:"touch" }}>
               <div style={{ display:"flex", gap:6, padding:"4px 12px", background:BORDO_DARK, height:24,
                 boxSizing:"border-box", alignItems:"center", width:"max-content" }}>
-                {["Pts","x3","x2","x1","+Hoy","▲▼"].map((h,i) => (
+                {["Pts","x3","x2","x1","x0","+Hoy","▲▼"].map((h,i) => (
                   <span key={i} style={{ fontSize:9, color:MARFIL_DARK, fontWeight:500,
-                    minWidth:i===0?36:i===4?32:i===5?28:COL_NUM, textAlign:"right" }}>{h}</span>
+                    minWidth:i===0?36:i===5?32:i===6?28:COL_NUM, textAlign:"right" }}>{h}</span>
                 ))}
               </div>
               {jugadores.map(j => {
-                const d = desglose[j.id] || { x3:0, x2:0, x1:0 };
+                const d = desglose[j.id] || { x3:0, x2:0, x1:0, x0:0 };
                 const mov = j.mov || 0;
                 const movEl = mov > 0
                   ? <span style={{ color:VERDE }}>▲{mov}</span>
@@ -692,6 +693,7 @@ function TabTabla({ onSelectUser }: { onSelectUser: (uid: string) => void }) {
                     <span style={{ fontSize:13, fontWeight:500, color:BORDO, minWidth:COL_NUM, textAlign:"right" }}>{d.x3}</span>
                     <span style={{ fontSize:13, fontWeight:500, color:"#555", minWidth:COL_NUM, textAlign:"right" }}>{d.x2}</span>
                     <span style={{ fontSize:13, fontWeight:500, color:"#999", minWidth:COL_NUM, textAlign:"right" }}>{d.x1}</span>
+                    <span style={{ fontSize:13, fontWeight:500, color:"#ccc", minWidth:COL_NUM, textAlign:"right" }}>{d.x0}</span>
                     <span style={{ fontSize:11, color:VERDE, minWidth:32, textAlign:"right" }}>+{j.hoy||0}</span>
                     <span style={{ fontSize:10, fontWeight:500, minWidth:28, textAlign:"right" }}>{movEl}</span>
                   </div>
@@ -1803,6 +1805,75 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
   const [diagnosticoResultado, setDiagnosticoResultado] = useState<any[]|null>(null);
   const [partidosAfectadosResumen, setPartidosAfectadosResumen] = useState<any[]>([]);
 
+  const [exportando, setExportando] = useState(false);
+
+  async function exportarCSVCompleto() {
+    setExportando(true);
+    try {
+      const partidosSnap = await getDocs(query(collection(db, "partidos"), orderBy("fecha"), orderBy("hora")));
+      const partidosInfo: Record<string, { gL:number, gV:number, localN:string, visitaN:string, fecha:string, hora:string }> = {};
+      partidosSnap.docs.forEach(d => {
+        const p = d.data();
+        if (p.gL !== null && p.gL !== undefined && p.gV !== null && p.gV !== undefined) {
+          partidosInfo[d.id] = { gL:p.gL, gV:p.gV, localN:p.localN||"", visitaN:p.visitaN||"", fecha:p.fecha||"", hora:p.hora||"" };
+        }
+      });
+
+      const pronosSnap = await getDocs(collection(db, "pronosticos"));
+      const porUsuario: Record<string, any[]> = {};
+      pronosSnap.docs.forEach(d => {
+        const data = d.data();
+        if (!porUsuario[data.userId]) porUsuario[data.userId] = [];
+        porUsuario[data.userId].push({ docId: d.id, ...data });
+      });
+
+      const usuariosSnap = await getDocs(collection(db, "usuarios"));
+      const filas: string[] = [];
+      filas.push([
+        "Jugador","Fecha","Local","Visitante","Pronostico","ResultadoReal",
+        "PtsDeberiaValer","PtsGuardado","Calculado","Coincide","MatchId"
+      ].join(","));
+
+      usuariosSnap.docs.forEach(d => {
+        const ud = d.data();
+        const nick = (ud.nick || "Sin nick").replace(/,/g, " ");
+        const misPronos = porUsuario[d.id] || [];
+
+        Object.entries(partidosInfo).forEach(([matchId, info]) => {
+          const prono = misPronos.find(p => p.matchId === matchId);
+          const tienePronostico = prono && prono.mL !== null && prono.mL !== undefined && prono.mV !== null && prono.mV !== undefined;
+
+          const ptsCorrectos = tienePronostico ? (calcPtsNuevo(info.gL, info.gV, prono.mL, prono.mV) ?? 0) : 0;
+          const ptsGuardado = tienePronostico ? (prono.pts ?? "null") : "sin pronostico";
+          const calculado = tienePronostico ? String(!!prono.calculado) : "-";
+          const coincide = tienePronostico ? (ptsCorrectos === prono.pts ? "OK" : "ERROR") : "-";
+          const miPronostico = tienePronostico ? `${prono.mL}-${prono.mV}` : "-";
+
+          filas.push([
+            nick, info.fecha, info.localN.replace(/,/g," "), info.visitaN.replace(/,/g," "),
+            miPronostico, `${info.gL}-${info.gV}`,
+            tienePronostico ? String(ptsCorrectos) : "-",
+            String(ptsGuardado), calculado, coincide, matchId
+          ].join(","));
+        });
+      });
+
+      const csvContent = filas.join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `diagnostico_puntos_${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert("Error al exportar, probá de nuevo");
+    }
+    setExportando(false);
+  }
+
   async function diagnosticarPuntos() {
     setDiagnosticando(true);
     setDiagnosticoResultado(null);
@@ -2170,6 +2241,19 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
                   padding:"6px 10px", fontSize:11, fontWeight:600, cursor:"pointer",
                   opacity:diagnosticando?0.6:1, whiteSpace:"nowrap" }}>
                 {diagnosticando ? "Revisando..." : "Diagnosticar"}
+              </button>
+            </div>
+            <div style={{ display:"flex", alignItems:"center", gap:10, padding:"0 14px 11px" }}>
+              <span style={{ fontSize:16 }}>📄</span>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:12, fontWeight:500 }}>Exportar CSV completo</div>
+                <div style={{ fontSize:10, color:"#888" }}>Todos los pronósticos vs resultados, jugador por jugador</div>
+              </div>
+              <button onClick={exportarCSVCompleto} disabled={exportando}
+                style={{ background:BORDO_DARK, color:MARFIL, border:"none", borderRadius:5,
+                  padding:"6px 10px", fontSize:11, fontWeight:600, cursor:"pointer",
+                  opacity:exportando?0.6:1, whiteSpace:"nowrap" }}>
+                {exportando ? "Generando..." : "Descargar CSV"}
               </button>
             </div>
             {partidosAfectadosResumen.length > 0 && (
