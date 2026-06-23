@@ -1806,22 +1806,23 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
     setDiagnosticando(true);
     setDiagnosticoResultado(null);
     try {
-      const partidosSnap = await getDocs(query(collection(db, "partidos"), orderBy("fecha"), orderBy("hora")));
-      const partidosOrden: string[] = [];
+      // Mapa de resultados reales por matchId
+      const partidosSnap = await getDocs(collection(db, "partidos"));
+      const resultadosReales: Record<string, { gL:number, gV:number }> = {};
       partidosSnap.docs.forEach(d => {
         const p = d.data();
-        if (p.gL !== null && p.gL !== undefined && p.gV !== null && p.gV !== undefined) partidosOrden.push(d.id);
+        if (p.gL !== null && p.gL !== undefined && p.gV !== null && p.gV !== undefined) {
+          resultadosReales[d.id] = { gL: p.gL, gV: p.gV };
+        }
       });
 
-      // TODOS los pronosticos (no solo los calculados), agrupando por userId+matchId
-      // para detectar si hay MAS DE UN documento para la misma combinacion (duplicados)
-      const todosPronosSnap = await getDocs(collection(db, "pronosticos"));
-      const porUsuario: Record<string, Record<string, { pts:number|null, calculado:boolean, docId:string }[]>> = {};
-      todosPronosSnap.docs.forEach(d => {
-        const { userId, matchId, pts, calculado } = d.data();
-        if (!porUsuario[userId]) porUsuario[userId] = {};
-        if (!porUsuario[userId][matchId]) porUsuario[userId][matchId] = [];
-        porUsuario[userId][matchId].push({ pts: pts ?? null, calculado: !!calculado, docId: d.id });
+      // Todos los pronosticos, agrupados por usuario
+      const pronosSnap = await getDocs(collection(db, "pronosticos"));
+      const porUsuario: Record<string, any[]> = {};
+      pronosSnap.docs.forEach(d => {
+        const data = d.data();
+        if (!porUsuario[data.userId]) porUsuario[data.userId] = [];
+        porUsuario[data.userId].push({ docId: d.id, ...data });
       });
 
       const usuariosSnap = await getDocs(collection(db, "usuarios"));
@@ -1829,33 +1830,42 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
 
       usuariosSnap.docs.forEach(d => {
         const ud = d.data();
-        const misPronos = porUsuario[d.id] || {};
+        const misPronos = porUsuario[d.id] || [];
+        const inconsistencias: any[] = [];
 
-        // Suma real: si hay duplicados para el mismo matchId, los suma TODOS (asi se nota el problema)
-        let sumaReal = 0;
-        const duplicados: any[] = [];
-        Object.entries(misPronos).forEach(([matchId, docs]) => {
-          if (docs.length > 1) {
-            duplicados.push({ matchId, docs });
+        misPronos.forEach(prono => {
+          const real = resultadosReales[prono.matchId];
+          if (!real) return; // el partido no tiene resultado todavia, no corresponde comparar
+          if (prono.mL === null || prono.mL === undefined || prono.mV === null || prono.mV === undefined) return; // no pronostico marcador
+
+          const ptsCorrectos = calcPtsNuevo(real.gL, real.gV, prono.mL, prono.mV) ?? 0;
+          const ptsGuardadoEnPronostico = prono.pts ?? null;
+
+          // Comparamos lo que DEBERIA valer este pronostico contra lo que tiene guardado
+          if (ptsCorrectos !== ptsGuardadoEnPronostico) {
+            inconsistencias.push({
+              matchId: prono.matchId,
+              miPronostico: `${prono.mL}-${prono.mV}`,
+              resultadoReal: `${real.gL}-${real.gV}`,
+              ptsQueDeberiaTener: ptsCorrectos,
+              ptsQueTieneGuardado: ptsGuardadoEnPronostico,
+              calculado: !!prono.calculado,
+            });
           }
-          docs.forEach(doc => { if (doc.calculado) sumaReal += (doc.pts || 0); });
         });
 
-        const ptsGuardado = ud.pts || 0;
-        const diferencia = sumaReal - ptsGuardado;
-
-        if (diferencia !== 0) {
-          const sinPronosticoAlguno = partidosOrden.filter(mid => !misPronos[mid]);
-          const conPronosticoSinCalcular = partidosOrden.filter(mid => {
-            const docs = misPronos[mid];
-            return docs && docs.every(doc => !doc.calculado);
-          });
+        if (inconsistencias.length > 0) {
+          const sumaCorrecta = misPronos.reduce((acc, prono) => {
+            const real = resultadosReales[prono.matchId];
+            if (!real || prono.mL === null || prono.mL === undefined || prono.mV === null || prono.mV === undefined) return acc;
+            return acc + (calcPtsNuevo(real.gL, real.gV, prono.mL, prono.mV) ?? 0);
+          }, 0);
 
           reporte.push({
             userId: d.id, nick: ud.nick || "Sin nick",
-            ptsGuardado, sumaReal, diferencia,
-            totalPartidosJugados: partidosOrden.length,
-            sinPronosticoAlguno, conPronosticoSinCalcular, duplicados,
+            ptsGuardado: ud.pts || 0,
+            sumaCorrecta,
+            inconsistencias,
           });
         }
       });
@@ -2164,48 +2174,21 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
                         <>
                           <div style={{ fontSize:12, fontWeight:600, color:BORDO }}>{r.nick}</div>
                           <div style={{ fontSize:11, color:"#555", marginTop:2 }}>
-                            Guardado: <b>{r.ptsGuardado}</b> · Suma real: <b>{r.sumaReal}</b> ·
-                            Diferencia: <b style={{ color:ROJO }}>{r.diferencia > 0 ? "+" : ""}{r.diferencia}</b>
-                            {" "}· {r.totalPartidosJugados} partidos jugados en total
+                            Guardado: <b>{r.ptsGuardado}</b> · Debería tener: <b style={{color:VERDE}}>{r.sumaCorrecta}</b>
                           </div>
-
-                          {r.duplicados.length > 0 && (
-                            <div style={{ marginTop:6 }}>
-                              <div style={{ fontSize:10, fontWeight:600, color:ROJO }}>
-                                🚨 Pronóstico DUPLICADO para el mismo partido ({r.duplicados.length}):
-                              </div>
-                              {r.duplicados.map((dup:any, j:number) => (
-                                <div key={j} style={{ fontSize:9, color:"#555", marginTop:3, paddingLeft:6 }}>
-                                  matchId: {dup.matchId}<br/>
-                                  {dup.docs.map((doc:any, k:number) => (
-                                    <span key={k}>↳ docId: {doc.docId} · pts: {doc.pts} · calculado: {String(doc.calculado)}<br/></span>
-                                  ))}
-                                </div>
-                              ))}
+                          <div style={{ fontSize:10, fontWeight:600, color:ROJO, marginTop:6 }}>
+                            Partidos con inconsistencia ({r.inconsistencias.length}):
+                          </div>
+                          {r.inconsistencias.map((inc:any, j:number) => (
+                            <div key={j} style={{ fontSize:10, color:"#555", marginTop:4, paddingLeft:6,
+                              borderLeft:`2px solid ${ROJO}` }}>
+                              matchId: {inc.matchId}<br/>
+                              Pronosticó <b>{inc.miPronostico}</b> · Resultado real <b>{inc.resultadoReal}</b><br/>
+                              Debería valer <b style={{color:VERDE}}>{inc.ptsQueDeberiaTener}pt</b> ·
+                              Tiene guardado <b style={{color:ROJO}}>{String(inc.ptsQueTieneGuardado)}pt</b> ·
+                              calculado: {String(inc.calculado)}
                             </div>
-                          )}
-
-                          {r.conPronosticoSinCalcular.length > 0 && (
-                            <div style={{ marginTop:6 }}>
-                              <div style={{ fontSize:10, fontWeight:600, color:ROJO }}>
-                                ⚠️ Pronosticó pero NO quedó marcado "calculado" ({r.conPronosticoSinCalcular.length}):
-                              </div>
-                              <div style={{ fontSize:9, color:"#888", marginTop:2, wordBreak:"break-all" }}>
-                                {r.conPronosticoSinCalcular.join(" | ")}
-                              </div>
-                            </div>
-                          )}
-
-                          {r.sinPronosticoAlguno.length > 0 && (
-                            <div style={{ marginTop:6 }}>
-                              <div style={{ fontSize:10, fontWeight:600, color:"#888" }}>
-                                Nunca pronosticó ({r.sinPronosticoAlguno.length}):
-                              </div>
-                              <div style={{ fontSize:9, color:"#aaa", marginTop:2, wordBreak:"break-all" }}>
-                                {r.sinPronosticoAlguno.join(" | ")}
-                              </div>
-                            </div>
-                          )}
+                          ))}
                         </>
                       )
                     }
