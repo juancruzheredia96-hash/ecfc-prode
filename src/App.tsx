@@ -1813,12 +1813,14 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
         if (p.gL !== null && p.gL !== undefined && p.gV !== null && p.gV !== undefined) partidosOrden.push(d.id);
       });
 
-      const pronosSnap = await getDocs(query(collection(db, "pronosticos"), where("calculado","==",true)));
-      const porUsuario: Record<string, Record<string, number>> = {};
-      pronosSnap.docs.forEach(d => {
-        const { userId, matchId, pts } = d.data();
-        if (!porUsuario[userId]) porUsuario[userId] = {};
-        porUsuario[userId][matchId] = pts || 0;
+      // TODOS los pronosticos (no solo los calculados), para distinguir "nunca pronosticó"
+      // de "pronosticó pero quedó sin marcar calculado"
+      const todosPronosSnap = await getDocs(collection(db, "pronosticos"));
+      const todosPorUsuario: Record<string, Record<string, { pts:number|null, calculado:boolean }>> = {};
+      todosPronosSnap.docs.forEach(d => {
+        const { userId, matchId, pts, calculado } = d.data();
+        if (!todosPorUsuario[userId]) todosPorUsuario[userId] = {};
+        todosPorUsuario[userId][matchId] = { pts: pts ?? null, calculado: !!calculado };
       });
 
       const usuariosSnap = await getDocs(collection(db, "usuarios"));
@@ -1826,19 +1828,30 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
 
       usuariosSnap.docs.forEach(d => {
         const ud = d.data();
-        const misPronos = porUsuario[d.id] || {};
-        const sumaReal = Object.values(misPronos).reduce((acc, v) => acc + v, 0);
+        const misPronos = todosPorUsuario[d.id] || {};
+
+        const sumaReal = Object.values(misPronos)
+          .filter(p => p.calculado)
+          .reduce((acc, p) => acc + (p.pts || 0), 0);
         const ptsGuardado = ud.pts || 0;
         const diferencia = sumaReal - ptsGuardado;
 
         if (diferencia !== 0) {
-          const partidosConPuntos = partidosOrden
-            .filter(mid => (misPronos[mid] || 0) > 0)
-            .map(mid => ({ matchId: mid, pts: misPronos[mid] }));
+          // Partidos jugados donde NO hay ningun documento de pronostico (nunca cargo nada)
+          const sinPronosticoAlguno = partidosOrden.filter(mid => !misPronos[mid]);
+          // Partidos jugados donde SI hay pronostico pero no quedo marcado calculado:true
+          // (este es el caso clave: se cargo el pronostico, pero el calculo de puntos no lo proceso)
+          const conPronosticoSinCalcular = partidosOrden.filter(mid => {
+            const p = misPronos[mid];
+            return p && !p.calculado;
+          });
 
           reporte.push({
             userId: d.id, nick: ud.nick || "Sin nick",
-            ptsGuardado, sumaReal, diferencia, partidosConPuntos,
+            ptsGuardado, sumaReal, diferencia,
+            totalPartidosJugados: partidosOrden.length,
+            sinPronosticoAlguno,
+            conPronosticoSinCalcular,
           });
         }
       });
@@ -2147,15 +2160,32 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
                         <>
                           <div style={{ fontSize:12, fontWeight:600, color:BORDO }}>{r.nick}</div>
                           <div style={{ fontSize:11, color:"#555", marginTop:2 }}>
-                            Guardado: <b>{r.ptsGuardado}</b> · Suma real de pronósticos: <b>{r.sumaReal}</b> ·
+                            Guardado: <b>{r.ptsGuardado}</b> · Suma real: <b>{r.sumaReal}</b> ·
                             Diferencia: <b style={{ color:ROJO }}>{r.diferencia > 0 ? "+" : ""}{r.diferencia}</b>
+                            {" "}· {r.totalPartidosJugados} partidos jugados en total
                           </div>
-                          <div style={{ fontSize:10, color:"#888", marginTop:4 }}>
-                            Partidos con puntos pronosticados ({r.partidosConPuntos.length}):
-                          </div>
-                          <div style={{ fontSize:9, color:"#aaa", marginTop:2, wordBreak:"break-all" }}>
-                            {r.partidosConPuntos.map((p:any) => `${p.matchId.slice(0,8)}…(${p.pts}pt)`).join(", ")}
-                          </div>
+
+                          {r.conPronosticoSinCalcular.length > 0 && (
+                            <div style={{ marginTop:6 }}>
+                              <div style={{ fontSize:10, fontWeight:600, color:ROJO }}>
+                                ⚠️ Pronosticó pero NO quedó marcado "calculado" ({r.conPronosticoSinCalcular.length}):
+                              </div>
+                              <div style={{ fontSize:9, color:"#888", marginTop:2, wordBreak:"break-all" }}>
+                                {r.conPronosticoSinCalcular.join(" | ")}
+                              </div>
+                            </div>
+                          )}
+
+                          {r.sinPronosticoAlguno.length > 0 && (
+                            <div style={{ marginTop:6 }}>
+                              <div style={{ fontSize:10, fontWeight:600, color:"#888" }}>
+                                Nunca pronosticó ({r.sinPronosticoAlguno.length}):
+                              </div>
+                              <div style={{ fontSize:9, color:"#aaa", marginTop:2, wordBreak:"break-all" }}>
+                                {r.sinPronosticoAlguno.join(" | ")}
+                              </div>
+                            </div>
+                          )}
                         </>
                       )
                     }
