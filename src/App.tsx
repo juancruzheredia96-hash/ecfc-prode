@@ -2096,6 +2096,11 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
   }
 
   async function eliminar(id: string) {
+    // Borrado en cascada: si el partido se elimina, sus pronosticos asociados quedarian
+    // huerfanos (con pts ya calculado pero apuntando a un matchId que no existe mas),
+    // contaminando el desglose x3/x2/x1 a futuro. Los borramos junto con el partido.
+    const pronosSnap = await getDocs(query(collection(db, "pronosticos"), where("matchId", "==", id)));
+    await Promise.all(pronosSnap.docs.map(d => deleteDoc(d.ref)));
     await deleteDoc(doc(db,"partidos",id));
     setConfirmDelete(null); setMsg("Partido eliminado");
     setTimeout(()=>setMsg(""),3000);
@@ -2104,8 +2109,10 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
   async function borrarTodo() {
     setLoading(true);
     const snap = await getDocs(collection(db,"partidos"));
+    const pronosSnap = await getDocs(collection(db, "pronosticos"));
+    await Promise.all(pronosSnap.docs.map(d => deleteDoc(d.ref))); // borra todos los pronosticos primero
     for (const d of snap.docs) await deleteDoc(doc(db,"partidos",d.id));
-    setConfirmBorrarTodo(false); setMsg("✓ Todos los partidos eliminados.");
+    setConfirmBorrarTodo(false); setMsg("✓ Todos los partidos y sus pronósticos eliminados.");
     setLoading(false); setTimeout(()=>setMsg(""),3000);
   }
 
