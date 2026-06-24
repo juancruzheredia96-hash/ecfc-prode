@@ -597,27 +597,30 @@ function TabTabla({ onSelectUser }: { onSelectUser: (uid: string) => void }) {
 
   // El primer partido real del torneo (Mexico vs Sudafrica) marca el corte: cualquier
   // pronostico de un partido con fecha anterior a esta es de pruebas iniciales y se descarta.
+  // Cargamos TODAS las fechas de partidos de una sola vez (no por-matchId) para minimizar lecturas.
+  const [fechaPorMatch, setFechaPorMatch] = useState<Record<string,string>>({});
+  const [partidosCargados, setPartidosCargados] = useState(false);
+
   useEffect(() => {
-    getDoc(doc(db, "partidos", "mgpUr5zbxrVJZHGBEN97")).then(snap => {
-      if (snap.exists() && snap.data().fecha) setFechaCorte(snap.data().fecha);
+    getDocs(collection(db, "partidos")).then(snap => {
+      const mapa: Record<string,string> = {};
+      snap.docs.forEach(d => { mapa[d.id] = d.data().fecha || ""; });
+      setFechaPorMatch(mapa);
+      setPartidosCargados(true);
+      if (mapa["mgpUr5zbxrVJZHGBEN97"]) setFechaCorte(mapa["mgpUr5zbxrVJZHGBEN97"]);
     });
   }, []);
 
   useEffect(() => {
+    if (!partidosCargados) return; // espera a tener el mapa completo antes de calcular el desglose
     const q = query(collection(db, "pronosticos"), where("calculado", "==", true));
-    return onSnapshot(q, async snap => {
-      // Necesitamos la fecha de cada partido para filtrar; armamos un mapa matchId->fecha una sola vez
-      const matchIds = Array.from(new Set(snap.docs.map(d => d.data().matchId).filter(Boolean)));
-      const fechaPorMatch: Record<string,string> = {};
-      await Promise.all(matchIds.map(async (mid:string) => {
-        const pSnap = await getDoc(doc(db,"partidos",mid));
-        if (pSnap.exists()) fechaPorMatch[mid] = pSnap.data().fecha || "";
-      }));
-
+    return onSnapshot(q, snap => {
       const acc: Record<string, { x3:number, x2:number, x1:number, x0:number }> = {};
       snap.docs.forEach(d => {
         const { userId, pts, matchId } = d.data();
         if (!userId || (pts !== 3 && pts !== 2 && pts !== 1 && pts !== 0)) return;
+        // Si el partido fue borrado de la base (simulaciones iniciales eliminadas), descartar igual
+        if (matchId && !(matchId in fechaPorMatch)) return;
         if (fechaCorte && matchId && fechaPorMatch[matchId] && fechaPorMatch[matchId] < fechaCorte) return; // descarta pruebas iniciales
         if (!acc[userId]) acc[userId] = { x3:0, x2:0, x1:0, x0:0 };
         if (pts === 3) acc[userId].x3++;
@@ -627,7 +630,7 @@ function TabTabla({ onSelectUser }: { onSelectUser: (uid: string) => void }) {
       });
       setDesglose(acc);
     });
-  }, [fechaCorte]);
+  }, [fechaCorte, fechaPorMatch, partidosCargados]);
 
   const COL_NUM = 38;
   const PADDING = 12;
