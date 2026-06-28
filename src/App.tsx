@@ -1830,12 +1830,16 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
   async function exportarCSVCompleto() {
     setExportando(true);
     try {
+      const primerPartidoSnap = await getDoc(doc(db, "partidos", "mgpUr5zbxrVJZHGBEN97"));
+      const fechaCorte = primerPartidoSnap.exists() ? (primerPartidoSnap.data().fecha || "") : "";
+
       const partidosSnap = await getDocs(query(collection(db, "partidos"), orderBy("fecha"), orderBy("hora")));
-      const partidosInfo: Record<string, { gL:number, gV:number, localN:string, visitaN:string, fecha:string, hora:string }> = {};
+      const partidosInfo: Record<string, { gL:number, gV:number, localN:string, visitaN:string, fecha:string, hora:string, esSimulacion:boolean }> = {};
       partidosSnap.docs.forEach(d => {
         const p = d.data();
         if (p.gL !== null && p.gL !== undefined && p.gV !== null && p.gV !== undefined) {
-          partidosInfo[d.id] = { gL:p.gL, gV:p.gV, localN:p.localN||"", visitaN:p.visitaN||"", fecha:p.fecha||"", hora:p.hora||"" };
+          const esSimulacion = !!(fechaCorte && p.fecha && p.fecha < fechaCorte);
+          partidosInfo[d.id] = { gL:p.gL, gV:p.gV, localN:p.localN||"", visitaN:p.visitaN||"", fecha:p.fecha||"", hora:p.hora||"", esSimulacion };
         }
       });
 
@@ -1851,7 +1855,7 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
       const filas: string[] = [];
       filas.push([
         "Jugador","Fecha","Local","Visitante","Pronostico","ResultadoReal",
-        "PtsDeberiaValer","PtsGuardado","Calculado","Coincide","MatchId"
+        "PtsDeberiaValer","PtsGuardado","Calculado","Coincide","EsSimulacion","MatchId"
       ].join(","));
 
       usuariosSnap.docs.forEach(d => {
@@ -1866,14 +1870,15 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
           const ptsCorrectos = tienePronostico ? (calcPtsNuevo(info.gL, info.gV, prono.mL, prono.mV) ?? 0) : 0;
           const ptsGuardado = tienePronostico ? (prono.pts ?? "null") : "sin pronostico";
           const calculado = tienePronostico ? String(!!prono.calculado) : "-";
-          const coincide = tienePronostico ? (ptsCorrectos === prono.pts ? "OK" : "ERROR") : "-";
+          // Si es partido de simulacion, no se considera ERROR aunque no coincida (se excluye a proposito del recalculo)
+          const coincide = !tienePronostico ? "-" : info.esSimulacion ? "N/A (simulacion)" : (ptsCorrectos === prono.pts ? "OK" : "ERROR");
           const miPronostico = tienePronostico ? `${prono.mL}-${prono.mV}` : "-";
 
           filas.push([
             nick, info.fecha, info.localN.replace(/,/g," "), info.visitaN.replace(/,/g," "),
             miPronostico, `${info.gL}-${info.gV}`,
             tienePronostico ? String(ptsCorrectos) : "-",
-            String(ptsGuardado), calculado, coincide, matchId
+            String(ptsGuardado), calculado, coincide, String(info.esSimulacion), matchId
           ].join(","));
         });
       });
@@ -1898,12 +1903,18 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
     setDiagnosticando(true);
     setDiagnosticoResultado(null);
     try {
-      // Mapa de resultados reales por matchId
+      // Misma fecha de corte que usa recalcularAciertoHistorico, para no marcar como
+      // "error" los partidos de simulacion/prueba que intencionalmente no se recalculan.
+      const primerPartidoSnap = await getDoc(doc(db, "partidos", "mgpUr5zbxrVJZHGBEN97"));
+      const fechaCorte = primerPartidoSnap.exists() ? (primerPartidoSnap.data().fecha || "") : "";
+
+      // Mapa de resultados reales por matchId (solo partidos posteriores al corte)
       const partidosSnap = await getDocs(collection(db, "partidos"));
       const resultadosReales: Record<string, { gL:number, gV:number }> = {};
       partidosSnap.docs.forEach(d => {
         const p = d.data();
         if (p.gL !== null && p.gL !== undefined && p.gV !== null && p.gV !== undefined) {
+          if (fechaCorte && p.fecha && p.fecha < fechaCorte) return; // descarta partidos de simulacion previos
           resultadosReales[d.id] = { gL: p.gL, gV: p.gV };
         }
       });
@@ -2027,15 +2038,17 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
       const totalPartidosConResultado = partidosOrdenados.length;
 
       const pronosSnap = await getDocs(collection(db, "pronosticos"));
-      const pronosPorUsuario: Record<string, Record<string, {mL:number, mV:number}>> = {};
+      const pronosPorUsuario: Record<string, Record<string, {mL:number, mV:number, docRef:any}>> = {};
       pronosSnap.docs.forEach(d => {
         const { userId, matchId, mL, mV } = d.data();
         if (mL === null || mV === null || mL === undefined || mV === undefined) return;
         if (!pronosPorUsuario[userId]) pronosPorUsuario[userId] = {};
-        pronosPorUsuario[userId][matchId] = { mL, mV };
+        pronosPorUsuario[userId][matchId] = { mL, mV, docRef: d.ref };
       });
 
       const usuariosSnap = await getDocs(collection(db, "usuarios"));
+      const escriturasPronosticos: Promise<any>[] = [];
+
       await Promise.all(usuariosSnap.docs.map(d => {
         const misPronos = pronosPorUsuario[d.id] || {};
         let golesAcertados = 0, golesPronosticados = 0, exactos = 0, aciertosResultado = 0;
@@ -2053,6 +2066,9 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
             if (prono.mL === real.gL) golesAcertados++;
             if (prono.mV === real.gV) golesAcertados++;
             if (ptsPartido >= 1) aciertosResultado++;
+            // Sincroniza el pts guardado en el documento del pronostico individual,
+            // que es justo lo que el diagnostico (y el desglose x3/x2/x1) compara/cuenta.
+            escriturasPronosticos.push(setDoc(prono.docRef, { pts: ptsPartido, calculado: true }, { merge:true }));
           }
           if (ptsPartido === 3) { exactos++; rachaActual++; } else { rachaActual = 0; }
           rachaMasLarga = Math.max(rachaMasLarga, rachaActual);
@@ -2070,6 +2086,9 @@ function AdminPanel({ onBack }: { onBack:()=>void }) {
           rachaActual, rachaMasLarga, ceroRacha,
         }, { merge:true });
       }));
+
+      // Espera a que todos los pronosticos individuales queden sincronizados con su pts real
+      await Promise.all(escriturasPronosticos);
 
       setRecalculoMsg(`✓ Recalculado para ${usuariosSnap.docs.length} jugadores`);
     } catch (e) {
