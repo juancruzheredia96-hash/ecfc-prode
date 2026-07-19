@@ -1639,6 +1639,15 @@ function ResultadosPremios({ onClose }: { onClose:()=>void }) {
     });
   }, []);
 
+  async function guardarParcial() {
+    setSaving(true);
+    setMsg("Guardando...");
+    await setDoc(doc(db, "config", "resultados_premios"), { ...resultados, updatedAt: serverTimestamp() }, { merge: true });
+    setMsg("✓ Guardado. Podés seguir cargando los demás.");
+    setSaving(false);
+    setTimeout(() => setMsg(""), 3000);
+  }
+
   async function guardarYCalcular() {
     const sinCompletar = PREDICCIONES_CATEGORIAS.filter(c => !resultados[c.id]);
     if (sinCompletar.length > 0) {
@@ -1662,11 +1671,15 @@ function ResultadosPremios({ onClose }: { onClose:()=>void }) {
           ✓ Ya se calcularon los puntos. Podés actualizar si hay correcciones.
         </div>
       )}
-      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+      <div style={{ fontSize:10, color:"#888", marginBottom:10 }}>
+        Podés guardar de a uno y volver después para completar los demás.
+      </div>
+      <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
         {PREDICCIONES_CATEGORIAS.map(cat => (
-          <div key={cat.id}>
-            <div style={{ fontSize:10, color:"#888", marginBottom:3 }}>
+          <div key={cat.id} style={{ background:MARFIL_LIGHT, borderRadius:8, padding:"10px 12px" }}>
+            <div style={{ fontSize:11, fontWeight:600, color:BORDO, marginBottom:6 }}>
               {cat.emoji} {cat.label} ({cat.pts} pts)
+              {resultados[cat.id] && <span style={{ color:VERDE, fontWeight:400, marginLeft:6 }}>✓ {resultados[cat.id]}</span>}
             </div>
             {cat.tipo === "pais" ? (
               <TeamAutocomplete
@@ -1675,10 +1688,11 @@ function ResultadosPremios({ onClose }: { onClose:()=>void }) {
                 placeholder="Buscá el país ganador..."
               />
             ) : (
-              <PlayerAutocomplete
+              <input
                 value={resultados[cat.id] || ""}
-                onChange={v => setResultados(r => ({...r, [cat.id]: v}))}
-                categoria={cat.id}
+                onChange={e => setResultados(r => ({...r, [cat.id]: e.target.value}))}
+                placeholder="Escribí el nombre..."
+                style={inputStyle()}
               />
             )}
           </div>
@@ -1688,15 +1702,20 @@ function ResultadosPremios({ onClose }: { onClose:()=>void }) {
         <div style={{ fontSize:11, color: msg.startsWith("✓")?VERDE:ROJO,
           marginTop:10, textAlign:"center" }}>{msg}</div>
       )}
-      <div style={{ display:"flex", gap:8, marginTop:12 }}>
-        <button onClick={onClose} style={{ flex:1, background:"none",
-          border:`1px solid #ccc`, borderRadius:6, padding:9, fontSize:12, color:"#111" }}>
-          Cancelar
+      <div style={{ display:"flex", flexDirection:"column", gap:8, marginTop:12 }}>
+        <button onClick={guardarParcial} disabled={saving}
+          style={{ background:"none", border:`1px solid ${BORDO}`, borderRadius:6,
+            padding:9, fontSize:12, color:BORDO, fontWeight:500 }}>
+          {saving ? "Guardando..." : "💾 Guardar sin calcular puntos"}
         </button>
         <button onClick={guardarYCalcular} disabled={saving}
-          style={{ flex:2, background:BORDO, color:MARFIL, border:"none",
+          style={{ background:BORDO, color:MARFIL, border:"none",
             borderRadius:6, padding:9, fontSize:12, fontWeight:600, opacity:saving?0.7:1 }}>
-          {saving ? "Calculando..." : "Guardar y calcular puntos"}
+          {saving ? "Calculando..." : "✅ Guardar y calcular puntos (final)"}
+        </button>
+        <button onClick={onClose} style={{ background:"none", border:"1px solid #ccc",
+          borderRadius:6, padding:8, fontSize:11, color:"#888" }}>
+          Cancelar
         </button>
       </div>
     </div>
